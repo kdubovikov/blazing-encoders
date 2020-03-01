@@ -2,20 +2,11 @@ use criterion::{BenchmarkId, black_box, Criterion, criterion_group, criterion_ma
 use ndarray::Array1;
 use num_traits::Num;
 
-use blazing_encoders::target_encoding;
+use blazing_encoders::{target_encoding, gen_array};
 use rand::{thread_rng, Rng};
 use rand::distributions::{Distribution, Uniform};
 use rand::distributions::uniform::UniformInt;
 
-fn gen_array<T, D>(n: usize, distr: &D) -> Array1<T>
-    where
-        T: Num + Clone,
-        D: Distribution<T>
-{
-    let mut random = thread_rng();
-    let mut result = Array1::<T>::from_shape_fn(n, |_| random.sample(distr));
-    return result;
-}
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("array size");

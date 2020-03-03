@@ -5,10 +5,11 @@ use std::hash::Hash;
 use itertools::Itertools;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use num_traits::{FromPrimitive, Num, ToPrimitive};
+use num_traits::{FromPrimitive, Num, ToPrimitive, Float};
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::iter::Sum;
+use ordered_float::OrderedFloat;
 
 pub fn gen_ndarray<T, D>(n: usize, distr: &D) -> Array1<T>
     where
@@ -30,10 +31,10 @@ pub fn gen_array<T, D>(n: usize, distr: &D) -> Vec<T>
     result
 }
 
-pub fn target_encoding<D, T>(data: &[D], target: &[T]) -> Array1<T>
+pub fn target_encoding<D, T>(data: &[OrderedFloat<D>], target: &[T]) -> Array1<T>
     where
         T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum,
-        D: Num + Copy + Ord + Eq + Hash + Sync + Debug + Sum + ToPrimitive {
+        D: Float + Num + Copy + Sync + Debug + Sum + ToPrimitive {
     let smoothing = 1.0;
     let min_samples_leaf = 1.;
 
@@ -48,6 +49,7 @@ pub fn target_encoding<D, T>(data: &[D], target: &[T]) -> Array1<T>
     let prior: f64 =  sum / target.len() as f64;
 
     let groups = data_target.iter().group_by(|x| *x.0);
+    // let groups: HashMap<D, Vec<T>> = data_target.into_iter().into_group_map();
 
     // calculate target encoding for each value in data
     let mut encodings = HashMap::new();
@@ -73,7 +75,7 @@ pub fn target_encoding<D, T>(data: &[D], target: &[T]) -> Array1<T>
     // create encoded array
     let data_len = data.len();
     let result = Array1::<T>::from_shape_fn(data_len, |idx| {
-        encodings.get(&data[idx]).unwrap().clone()
+        *encodings.get(&data[idx]).unwrap()
     });
 
     // data.iter_mut().map(|x| encodings.get(x).unwrap());
@@ -91,9 +93,11 @@ mod tests {
 
     #[test]
     fn test_target_encoding() {
-        let a = [0, 1, 1, 0, 3, 0, 1];
+        let a = [0., 1., 1., 0., 3., 0., 1.];
         let b = [1., 2., 2., 1., 0., 1., 2.];
-        let encodings = target_encoding(&a, &b);
+        let a = a.iter().map(|x| OrderedFloat::from(*x)).collect_vec();
+
+        let encodings = target_encoding(&a.as_slice(), &b);
         let expected = Array1::from(vec![1.0, 2.0, 2.0, 1.0, 0.0, 1.0, 2.0]);
         assert_eq!(expected, encodings);
         // assert_approx_eq!(expected, encodings);

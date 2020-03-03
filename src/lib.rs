@@ -10,6 +10,16 @@ use rayon::prelude::*;
 use std::iter::Sum;
 use ordered_float::OrderedFloat;
 
+pub trait ToOrderedFloat<T>: where T: Float {
+    fn to_ordered_float(&self) -> Vec<OrderedFloat<T>>;
+}
+
+impl ToOrderedFloat<f32> for Vec<f32> {
+    fn to_ordered_float(&self) -> Vec<OrderedFloat<f32>> {
+        self.iter().map(|x| OrderedFloat::<f32>::from(*x)).collect_vec()
+    }
+}
+
 pub fn gen_ndarray<T, D>(n: usize, distr: &D) -> Array1<T>
     where
         T: Num + Clone,
@@ -89,7 +99,7 @@ mod tests {
     #[test]
     fn test_target_encoding() {
         let a = vec![0., 1., 1., 0., 3., 0., 1.];
-        let mut a = a.iter().map(|x| OrderedFloat::from(*x)).collect_vec();
+        let mut a = a.to_ordered_float();
         let b = [1., 2., 2., 1., 0., 1., 2.];
 
         let encodings = target_encoding(&mut a, &b);

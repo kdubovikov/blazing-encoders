@@ -2,7 +2,7 @@ use criterion::{BenchmarkId, black_box, Criterion, criterion_group, criterion_ma
 use ndarray::Array1;
 use num_traits::Num;
 
-use blazing_encoders::{target_encoding, gen_array, gen_array_f32};
+use blazing_encoders::{target_encoder, gen_array, gen_array_f32};
 use rand::{thread_rng, Rng};
 use rand::distributions::{Distribution, Uniform};
 use rand::distributions::uniform::UniformInt;

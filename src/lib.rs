@@ -1,18 +1,14 @@
-use std::fmt::{Debug};
+mod target_encoder;
+mod utils;
 
-use itertools::Itertools;
-use ndarray::prelude::*;
-use num_traits::{FromPrimitive, Num, ToPrimitive, Float, AsPrimitive};
-use rand::prelude::*;
-use rayon::prelude::*;
-use std::iter::Sum;
-use ordered_float::OrderedFloat;
-use fnv::FnvHashMap;
-
+use ndarray::{ArrayD, ArrayViewD, ArrayViewMutD, Dim};
+use numpy::{IntoPyArray, PyArrayDyn, PyArray};
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
-use ndarray::{ArrayD, ArrayViewD, ArrayViewMutD};
-use numpy::{IntoPyArray, PyArrayDyn, PyArray};
+
+use target_encoder::target_encoding;
+use utils::ToOrderedFloat;
+use itertools::Itertools;
 
 #[pymodule]
 fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -30,116 +26,4 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         d.into_pyarray(py).to_owned()
     }
     Ok(())
-}
-
-pub trait ToOrderedFloat<T>: where T: Float {
-    fn to_ordered_float(&self) -> Vec<OrderedFloat<T>>;
-}
-
-impl ToOrderedFloat<f32> for Vec<f32> {
-    fn to_ordered_float(&self) -> Vec<OrderedFloat<f32>> {
-        self.iter().map(|x| OrderedFloat::<f32>::from(*x)).collect_vec()
-    }
-}
-
-impl ToOrderedFloat<f64> for Vec<f64> {
-    fn to_ordered_float(&self) -> Vec<OrderedFloat<f64>> {
-        self.iter().map(|x| OrderedFloat::<f64>::from(*x)).collect_vec()
-    }
-}
-pub fn gen_array<T, D>(n: usize, distr: &D) -> Vec<T>
-    where
-        T: Num + Clone,
-        D: Distribution<T> {
-    let mut random = thread_rng();
-    let result : Vec<T> = (0..n).map(|_| {
-        random.sample(distr)
-    }).collect();
-    result
-}
-
-pub fn gen_array_f32<T, D>(n: usize, distr: &D) -> Vec<f32>
-    where
-        T: Num + Clone + AsPrimitive<f32>,
-        D: Distribution<T> {
-    gen_array(n, distr).iter().map(|x| x.as_()).collect_vec()
-}
-
-pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
-    where
-        T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive,
-        D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive {
-    let smoothing = 1.0;
-    let min_samples_leaf = 1.;
-
-    // group targets by each item in data
-    let mut data_target: Vec<_> = data.iter().zip(target).collect(); // TODO array instead of vec
-    data_target.par_sort_unstable_by_key(|x| *x.0);
-
-    let d = data_target.iter().map(|(a, _)| *a).collect_vec();
-    let num_groups: usize = d.into_iter().map(|x| *x).dedup().count();
-
-    let sum: f64 = T::to_f64(&data_target.iter().map(|x| *x.1).sum::<T>()).unwrap();
-    let prior: f64 =  sum / target.len() as f64;
-
-    let groups = data_target.into_iter().group_by(|x| *x.0);
-
-    // calculate target encoding for each value in data
-    // let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::default();
-    let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::with_capacity_and_hasher(num_groups, Default::default());
-    for (k, v) in &groups {
-        let val: Array1<f64> = v.map(|x| {
-            T::to_f64(x.1).unwrap()
-        }).collect();
-        let count: usize = val.len();
-
-        if count == 1 {
-            encodings.insert(k, OrderedFloat::from(D::from_f64(prior).unwrap()));
-        } else {
-            let encoding = compute_encoding(&val, count as f64, min_samples_leaf, smoothing, prior);
-            encodings.insert(k, OrderedFloat::from(D::from_f64(encoding).unwrap()));
-        }
-    }
-
-    // create encoded array
-    for x in data.iter_mut() {
-        *x = *encodings.get(x).unwrap();
-    };
-}
-
-fn compute_encoding(val: &Array1<f64>, count: f64, min_samples_leaf: f64, smoothing: f64, prior: f64) -> f64 {
-    let group_mean: f64 = &val.sum() / count as f64;
-    let exp_count: f64 = -(count as f64 - min_samples_leaf as f64) / smoothing;
-    let smoove: f64 = 1.0 / (1.0 + exp_count.exp());
-    prior * (1.0 - smoove) + group_mean * smoove
-}
-
-
-#[cfg(test)]
-mod tests {
-    use itertools::Itertools;
-    use ndarray::{Array1, Zip};
-    use super::*;
-    use crate::target_encoding;
-    use assert_approx_eq::assert_approx_eq;
-
-    #[test]
-    fn test_target_encoding() {
-        let a = vec![0., 1., 1., 0., 3., 0., 1.];
-        let mut a = a.to_ordered_float();
-        let b = [1., 2., 2., 1., 0., 1., 2.];
-        // let mut a = Array1::from(a);
-        // let b = Array1::from(b);
-
-        let encodings = target_encoding(&mut a, &b);
-        let expected = vec![1.0, 2.0, 2.0, 1.0, 0.0, 1.0, 2.0];
-
-        assert_eq!(expected, a.iter().map(|x| x.0).collect_vec());
-    }
-
-    #[test]
-    fn test_par() {
-        let a = Array1::<i32>::from(vec![0, 1, 1, 0, 3, 0, 1]);
-
-    }
 }

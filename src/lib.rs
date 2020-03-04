@@ -1,14 +1,13 @@
-use std::collections::HashMap;
 use std::fmt::{Debug};
 
 use itertools::Itertools;
-use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use num_traits::{FromPrimitive, Num, ToPrimitive, Float};
+use num_traits::{FromPrimitive, Num, ToPrimitive, Float, AsPrimitive};
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::iter::Sum;
 use ordered_float::OrderedFloat;
+use fnv::FnvHashMap;
 
 pub trait ToOrderedFloat<T>: where T: Float {
     fn to_ordered_float(&self) -> Vec<OrderedFloat<T>>;
@@ -18,15 +17,6 @@ impl ToOrderedFloat<f32> for Vec<f32> {
     fn to_ordered_float(&self) -> Vec<OrderedFloat<f32>> {
         self.iter().map(|x| OrderedFloat::<f32>::from(*x)).collect_vec()
     }
-}
-
-pub fn gen_ndarray<T, D>(n: usize, distr: &D) -> Array1<T>
-    where
-        T: Num + Clone,
-        D: Distribution<T> {
-    let mut random = thread_rng();
-    let result = Array1::<T>::from_shape_fn(n, |_| random.sample(distr));
-    result
 }
 
 pub fn gen_array<T, D>(n: usize, distr: &D) -> Vec<T>
@@ -40,6 +30,13 @@ pub fn gen_array<T, D>(n: usize, distr: &D) -> Vec<T>
     result
 }
 
+pub fn gen_array_f32<T, D>(n: usize, distr: &D) -> Vec<f32>
+    where
+        T: Num + Clone + AsPrimitive<f32>,
+        D: Distribution<T> {
+    gen_array(n, distr).iter().map(|x| x.as_()).collect_vec()
+}
+
 pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
     where
         T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive,
@@ -49,19 +46,19 @@ pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
 
     // group targets by each item in data
     let mut data_target: Vec<_> = data.iter().zip(target).collect(); // TODO array instead of vec
-    data_target.par_sort_unstable_by_key(|x| {
-            let idx = *x.0;
-            idx
-    });
+    data_target.par_sort_unstable_by_key(|x| *x.0);
+
+    let d = data_target.iter().map(|(a, _)| *a).collect_vec();
+    let num_groups: usize = d.into_iter().map(|x| *x).dedup().count();
 
     let sum: f64 = T::to_f64(&data_target.iter().map(|x| *x.1).sum::<T>()).unwrap();
     let prior: f64 =  sum / target.len() as f64;
 
-    let groups = data_target.iter().group_by(|x| *x.0);
-    // let groups: HashMap<D, Vec<T>> = data_target.into_iter().into_group_map();
+    let groups = data_target.into_iter().group_by(|x| *x.0);
 
     // calculate target encoding for each value in data
-    let mut encodings: HashMap<OrderedFloat<D>, OrderedFloat<D>> = HashMap::new();
+    // let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::default();
+    let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::with_capacity_and_hasher(num_groups, Default::default());
     for (k, v) in &groups {
         let val: Array1<T> = v.map(|x| {
             *x.1
@@ -75,8 +72,6 @@ pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
             let exp_count: f64 = -(count as f64 - min_samples_leaf) / smoothing;
             let smoove: f64 = 1.0 / (1.0 + exp_count.exp());
             let encoding = prior * (1.0 - smoove) + group_mean * smoove;
-            // let encoding: T = T::from(val.sum() / T::from_usize(count).unwrap());
-            // encodings.insert(k, encoding);
             encodings.insert(k, OrderedFloat::from(D::from_f64(encoding).unwrap()));
         }
     }

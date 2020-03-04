@@ -22,4 +22,8 @@ ordered-float = "1.0.2"
 num-traits = "0.2.11"
 itertools = "0.8.2"
 rand = "0.7.3"
-intel-mkl-sys = "0.1.0"
+#intel-mkl-sys = "0.1.0"
+fnv = "1.0.2"
+
+[profile.dev]
+opt-level = 3

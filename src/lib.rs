@@ -9,6 +9,29 @@ use std::iter::Sum;
 use ordered_float::OrderedFloat;
 use fnv::FnvHashMap;
 
+use pyo3::prelude::*;
+use pyo3::wrap_pyfunction;
+use ndarray::{ArrayD, ArrayViewD, ArrayViewMutD};
+use numpy::{IntoPyArray, PyArrayDyn, PyArray};
+
+#[pymodule]
+fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
+    #[pyfn(m, "target_encoding")]
+    fn target_encoding_py(
+        py: Python,
+        data: &PyArrayDyn<f64>,
+        target: &PyArrayDyn<f64>,
+    ) -> Py<PyArray<f64, Dim<[usize; 1]>>> {
+        let mut data = data.as_slice_mut().unwrap();
+        let target = target.as_slice().unwrap();
+        let mut d = Vec::from(data).to_ordered_float();
+        target_encoding(&mut d, target);
+        let mut d = d.iter().map(|x| x.0).collect_vec();
+        d.into_pyarray(py).to_owned()
+    }
+    Ok(())
+}
+
 pub trait ToOrderedFloat<T>: where T: Float {
     fn to_ordered_float(&self) -> Vec<OrderedFloat<T>>;
 }
@@ -19,6 +42,11 @@ impl ToOrderedFloat<f32> for Vec<f32> {
     }
 }
 
+impl ToOrderedFloat<f64> for Vec<f64> {
+    fn to_ordered_float(&self) -> Vec<OrderedFloat<f64>> {
+        self.iter().map(|x| OrderedFloat::<f64>::from(*x)).collect_vec()
+    }
+}
 pub fn gen_array<T, D>(n: usize, distr: &D) -> Vec<T>
     where
         T: Num + Clone,
@@ -60,18 +88,15 @@ pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
     // let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::default();
     let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::with_capacity_and_hasher(num_groups, Default::default());
     for (k, v) in &groups {
-        let val: Array1<T> = v.map(|x| {
-            *x.1
+        let val: Array1<f64> = v.map(|x| {
+            T::to_f64(x.1).unwrap()
         }).collect();
         let count: usize = val.len();
 
         if count == 1 {
             encodings.insert(k, OrderedFloat::from(D::from_f64(prior).unwrap()));
         } else {
-            let group_mean: f64 = T::to_f64(&val.sum()).unwrap() / count as f64;
-            let exp_count: f64 = -(count as f64 - min_samples_leaf) / smoothing;
-            let smoove: f64 = 1.0 / (1.0 + exp_count.exp());
-            let encoding = prior * (1.0 - smoove) + group_mean * smoove;
+            let encoding = compute_encoding(&val, count as f64, min_samples_leaf, smoothing, prior);
             encodings.insert(k, OrderedFloat::from(D::from_f64(encoding).unwrap()));
         }
     }
@@ -80,6 +105,13 @@ pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
     for x in data.iter_mut() {
         *x = *encodings.get(x).unwrap();
     };
+}
+
+fn compute_encoding(val: &Array1<f64>, count: f64, min_samples_leaf: f64, smoothing: f64, prior: f64) -> f64 {
+    let group_mean: f64 = &val.sum() / count as f64;
+    let exp_count: f64 = -(count as f64 - min_samples_leaf as f64) / smoothing;
+    let smoove: f64 = 1.0 / (1.0 + exp_count.exp());
+    prior * (1.0 - smoove) + group_mean * smoove
 }
 
 
@@ -96,6 +128,8 @@ mod tests {
         let a = vec![0., 1., 1., 0., 3., 0., 1.];
         let mut a = a.to_ordered_float();
         let b = [1., 2., 2., 1., 0., 1., 2.];
+        // let mut a = Array1::from(a);
+        // let b = Array1::from(b);
 
         let encodings = target_encoding(&mut a, &b);
         let expected = vec![1.0, 2.0, 2.0, 1.0, 0.0, 1.0, 2.0];

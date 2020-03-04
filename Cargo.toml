@@ -19,6 +19,7 @@ rayon = "1.3.0"
 ndarray = {version = "0.13.0", features=["rayon"]}
 ordered-float = "1.0.2"
 #pyo3 = "0.8.5"
+#rust-numpy = "0.7.0"
 num-traits = "0.2.11"
 itertools = "0.8.2"
 rand = "0.7.3"

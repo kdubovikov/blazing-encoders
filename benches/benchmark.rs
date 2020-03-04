@@ -31,7 +31,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 }
 
 pub fn benchmark(c: &mut Criterion) {
-    const SIZE: usize = 100000;
+    const SIZE: usize = 10000;
     let mut data = gen_array_f32::<i32, _>(SIZE, &Uniform::new(0, 3000));
     let mut data = data.iter().map(|x| OrderedFloat::<f32>::from(*x)).collect_vec();
     let target = gen_array::<f32, _>(SIZE, &Uniform::new(0.0, 1000.0));

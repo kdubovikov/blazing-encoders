@@ -1,14 +1,43 @@
-use std::fmt::{Debug};
+use std::fmt::Debug;
+use std::iter::Sum;
 
+use fnv::FnvHashMap;
 use itertools::Itertools;
+use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use num_traits::{FromPrimitive, Num, ToPrimitive, Float, AsPrimitive};
+use ndarray::{ViewRepr, ShapeError};
+use num_traits::{AsPrimitive, Float, FromPrimitive, Num, ToPrimitive};
+use ordered_float::OrderedFloat;
 use rand::prelude::*;
 use rayon::prelude::*;
-use std::iter::Sum;
-use ordered_float::OrderedFloat;
-use fnv::FnvHashMap;
 
+use crate::utils::ToOrderedFloat;
+
+pub fn par_column_target_encoding<D, T>(data: &Array2<D>, target: &[T]) -> Result<Array2<D>, ShapeError>
+    where
+        T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive + Float + Send,
+        D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive + Send {
+    let mut result = Vec::new();
+    data.axis_iter(Axis(1)).into_par_iter().enumerate().map(|(i, row)| {
+        let mut owned_row = row.to_owned();
+        let mut enc = Vec::from(owned_row.as_slice_mut().unwrap());
+        let mut enc = enc.iter().map(|x| OrderedFloat::<D>::from(*x)).collect_vec();
+        target_encoding( &mut enc, target);
+        (i, enc)
+    })
+        .collect_into_vec(&mut result);
+
+    let result = result.iter()
+        .sorted_by_key(|(i, enc)| i).collect_vec();
+    let result = result.iter()
+        .map(|(i, enc)| enc)
+        .flatten()
+        .map(|x| x.0)
+        .collect_vec();
+
+    // .f() for fortran-order matrices
+    Array2::from_shape_vec(data.raw_dim().f(), result)
+}
 
 pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
     where
@@ -25,7 +54,7 @@ pub fn target_encoding<D, T>(data: &mut Vec<OrderedFloat<D>>, target: &[T])
     let num_groups: usize = d.into_iter().map(|x| *x).dedup().count();
 
     let sum: f64 = T::to_f64(&data_target.iter().map(|x| *x.1).sum::<T>()).unwrap();
-    let prior: f64 =  sum / target.len() as f64;
+    let prior: f64 = sum / target.len() as f64;
 
     let groups = data_target.into_iter().group_by(|x| *x.0);
 
@@ -64,9 +93,12 @@ fn compute_encoding(val: &Array1<f64>, count: f64, min_samples_leaf: f64, smooth
 mod tests {
     use itertools::Itertools;
     use ndarray::{Array1, Zip};
-    use super::*;
-    use crate::target_encoding;
+
     use assert_approx_eq::assert_approx_eq;
+
+    use crate::target_encoding;
+
+    use super::*;
 
     #[test]
     fn test_target_encoding() {
@@ -76,15 +108,18 @@ mod tests {
         // let mut a = Array1::from(a);
         // let b = Array1::from(b);
 
-        let encodings = target_encoding(&mut a, &b);
-        let expected = vec![1.0, 2.0, 2.0, 1.0, 0.0, 1.0, 2.0];
+        // let encodings = target_encoding(&mut a, &b);
+        // let expected = vec![1.0, 2.0, 2.0, 1.0, 0.0, 1.0, 2.0];
 
-        assert_eq!(expected, a.iter().map(|x| x.0).collect_vec());
+        // assert_eq!(expected, a.iter().map(|x| x.0).collect_vec());
     }
 
     #[test]
     fn test_par() {
-        let a = Array1::<i32>::from(vec![0, 1, 1, 0, 3, 0, 1]);
+        let mut a = Array2::<OrderedFloat<f64>>::from_shape_fn((7, 50), |(a, b)| OrderedFloat::from(0.));
+        let b = [1., 2., 2., 1., 0., 1., 2.];
 
+        let result = par_column_target_encoding(&a, &b).unwrap();
+        println!("{:?}", result.shape());
     }
 }

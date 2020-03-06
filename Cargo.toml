@@ -30,5 +30,5 @@ rand = "0.7.3"
 #intel-mkl-sys = "0.1.0"
 fnv = "1.0.2"
 
-[profile.dev]
-opt-level = 3
+#[profile.dev]
+#opt-level = 3

@@ -3,9 +3,9 @@ use std::iter::Sum;
 
 use fnv::FnvHashMap;
 use itertools::Itertools;
+use ndarray::{ShapeError, ViewRepr};
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use ndarray::{ViewRepr, ShapeError};
 use num_traits::{AsPrimitive, Float, FromPrimitive, Num, ToPrimitive};
 use ordered_float::OrderedFloat;
 use rand::prelude::*;
@@ -22,7 +22,7 @@ pub fn par_column_target_encoding<D, T>(data: &Array2<D>, target: &[T]) -> Resul
         let mut owned_row = row.to_owned();
         let mut enc = Vec::from(owned_row.as_slice_mut().unwrap());
         let mut enc = enc.iter().map(|x| OrderedFloat::<D>::from(*x)).collect_vec();
-        target_encoding( &mut enc, target);
+        target_encoding(&mut enc, target);
         (i, enc)
     })
         .collect_into_vec(&mut result);
@@ -105,21 +105,26 @@ mod tests {
         let a = vec![0., 1., 1., 0., 3., 0., 1.];
         let mut a = a.to_ordered_float();
         let b = [1., 2., 2., 1., 0., 1., 2.];
-        // let mut a = Array1::from(a);
-        // let b = Array1::from(b);
 
-        // let encodings = target_encoding(&mut a, &b);
-        // let expected = vec![1.0, 2.0, 2.0, 1.0, 0.0, 1.0, 2.0];
-
-        // assert_eq!(expected, a.iter().map(|x| x.0).collect_vec());
+        target_encoding(&mut a, &b);
+        let expected = vec![1.0340579777206051, 1.9148550556984874, 1.9148550556984874, 1.0340579777206051, 1.2857142857142858, 1.0340579777206051, 1.9148550556984874];
+        let a = a.iter().map(|x| x.0).collect_vec();
+        expected.iter().zip(a.iter()).map(|(e, a): (&f64, &f64)| {
+            assert_approx_eq!(e, a);
+        });
     }
 
     #[test]
     fn test_par() {
-        let mut a = Array2::<OrderedFloat<f64>>::from_shape_fn((7, 50), |(a, b)| OrderedFloat::from(0.));
+        let mut a = Array2::<f64>::zeros((10, 7));
         let b = [1., 2., 2., 1., 0., 1., 2.];
 
         let result = par_column_target_encoding(&a, &b).unwrap();
-        println!("{:?}", result.shape());
+        assert_eq!(result.shape(), a.shape());
+
+        const RESULT: f64 = 1.2857142857142858;
+        for r in result.iter() {
+            assert_approx_eq!(r, RESULT);
+        }
     }
 }

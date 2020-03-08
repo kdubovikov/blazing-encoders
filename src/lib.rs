@@ -1,5 +1,5 @@
-mod target_encoder;
-mod utils;
+pub mod target_encoder;
+pub mod utils;
 
 use ndarray::{ArrayD, ArrayViewD, ArrayViewMutD, Dim, Axis};
 use numpy::{IntoPyArray, PyArrayDyn, PyArray, PyArray2, PyArray1};

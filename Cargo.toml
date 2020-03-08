@@ -6,7 +6,11 @@ edition = "2018"
 
 [lib]
 name = "blazing_encoders"
-crate-type = ["cdylib"] # could be `staticlib` as well
+crate-type = [
+"cdylib",
+"rlib"
+]
+bench = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

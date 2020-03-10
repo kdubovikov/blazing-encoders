@@ -14,7 +14,7 @@ pub fn benchmark_cat_size(c: &mut Criterion) {
     let mut group = c.benchmark_group("array size");
     const CAT_SIZE: usize = 3000;
 
-    for size in [10, 100, 1000].iter() {
+    for size in [10, 100, 1000, 10000, 100000, 1000000].iter() {
         group.throughput(Throughput::Elements(*size as u64));
         let mut data = gen_array_f32::<i32, _>(size as usize, &Uniform::new(0, CAT_SIZE));
         let target = gen_array::<f32, _>(size as usize, &Uniform::new(0.0, 1000.0));

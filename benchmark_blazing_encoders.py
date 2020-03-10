@@ -21,7 +21,7 @@ def compare_encoders(a, b, cols, blazing_encoder_fun, flatten_te=False):
     print(f"{'category_encoders':<20}{time_category_encoders:>15.3f}")
 
     speed_ratio = time_blazing / time_category_encoders
-    if speed_ratio > 0:
+    if speed_ratio < 1:
         print(f"blazing encoders are {1 / speed_ratio:.2f} times faster ⬆️")
     else:
         print(f"blazing encoders are {speed_ratio:.2f} times slower ⬇️")

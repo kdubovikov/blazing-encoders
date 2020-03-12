@@ -11,8 +11,44 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use crate::target_encoder::{ColumnTargetEncoder, TargetEncoder};
 
+macro_rules! create_target_encoder_class {
+    ($name:ident, $type:ty) => {
+        #[pyclass]
+        struct $name {
+            encoder: TargetEncoder<$type, $type>
+        }
+
+        #[pymethods]
+        impl $name {
+            #[staticmethod]
+            fn fit(py: Python, data: &PyArray2<$type>, target: &PyArray1<$type>) -> Self {
+                let mut data = data.as_array_mut().mapv::<OrderedFloat<$type>, _>(OrderedFloat::from);
+                let target = target.as_slice().unwrap();
+                let encoder = py.allow_threads(move || {
+                    TargetEncoder::fit(&data, target)
+                });
+
+                $name { encoder }
+            }
+
+            fn transform(&self, py: Python, data: &PyArray2<$type>) -> Py<PyArray2<$type>> {
+                let mut data = data.as_array_mut().mapv::<OrderedFloat<$type>, _>(OrderedFloat::from);
+                self.encoder.transform(&mut data);
+                Array2::from(data).map(|x| x.0).into_pyarray(py).to_owned()
+            }
+        }
+
+    }
+}
+
+create_target_encoder_class!(TargetEncoder_f64, f64);
+create_target_encoder_class!(TargetEncoder_f32, f32);
+
 #[pymodule]
 fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<TargetEncoder_f64>();
+    m.add_class::<TargetEncoder_f32>();
+
     #[pyfn(m, "target_encoding")]
     fn target_encoding_py(
         py: Python,

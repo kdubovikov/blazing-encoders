@@ -4,66 +4,56 @@ use std::marker::PhantomData;
 
 use fnv::FnvHashMap;
 use itertools::Itertools;
+use ndarray::IntoNdProducer;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use num_traits::{Float, FromPrimitive, Num, ToPrimitive};
 use ordered_float::OrderedFloat;
-// use rand::prelude::*;
 use rayon::prelude::*;
 
 use crate::utils::ToOrderedFloat;
-use ndarray::IntoNdProducer;
 
-pub struct TargetEncoder<D, T>
-    where
-        T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive + Float + Send,
-        D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive + Send {
+pub struct TargetEncoder<D, T> where D: Float, T: Float {
+    encodings: Vec<ColumnTargetEncoder<D, T>>,
+    phantom_target: PhantomData<T>,
+}
+
+pub struct ColumnTargetEncoder<D, T> where D: Float, T: Float {
     encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>>,
     num_groups: usize,
-    phantom_target: PhantomData<T>
+    phantom_target: PhantomData<T>,
 }
 
 impl<D, T> TargetEncoder<D, T>
     where
         T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive + Float + Send,
         D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive + Send {
-
     pub fn fit(data: &Array2<OrderedFloat<D>>, target: &[T]) -> TargetEncoder<D, T> {
-        let mut encodings: Vec<(usize, TargetEncoder<D, T>)> = Vec::new();
+        let mut encodings: Vec<ColumnTargetEncoder<D, T>> = Vec::with_capacity(data.len_of(Axis(1)));
 
         data.axis_iter(Axis(1)).into_par_iter().enumerate().map(|(i, row)| {
             let mut owned_row = row.to_owned();
             let mut enc = Vec::from(owned_row.as_slice_mut().unwrap());
             let mut enc = enc.iter().map(|x| OrderedFloat::<D>::from(*x)).collect_vec();
-            let encoder = Self::fit_one_column(&mut enc, target);
-            (i, encoder)
+            let encoder = ColumnTargetEncoder::fit(&mut enc, target);
+            encoder
         }).collect_into_vec(&mut encodings);
 
-        encodings.sort_unstable_by_key(|(i, encoder)| *i);
-        let num_groups = encodings.iter().map(|(i, encoder)| encoder.num_groups).sum::<usize>();
-        let num_groups= num_groups / encodings.len();
-        let mut comb_encodings = FnvHashMap::with_capacity_and_hasher(num_groups, Default::default());
-
-        for (_, enc) in encodings {
-            let x = &enc.encodings;
-            comb_encodings.extend(x);
-        }
-
-        TargetEncoder { encodings: comb_encodings, num_groups, phantom_target: PhantomData }
-
-        // let result = result.iter()
-        //     .sorted_by_key(|(i, enc)| i).collect_vec();
-        // let result = result.iter()
-        //     .map(|(i, enc)| enc)
-        //     .flatten()
-        //     .map(|x| x.0)
-        //     .collect_vec();
-        //
-        // // .f() for fortran-order matrices
-        // Array2::from_shape_vec(data.raw_dim().f(), result)
+        TargetEncoder { encodings, phantom_target: PhantomData }
     }
 
-    pub fn fit_one_column(data: &Vec<OrderedFloat<D>>, target: &[T]) -> TargetEncoder<D, T>
+    pub fn transform(&self, data: &mut Array2<OrderedFloat<D>>) {
+        for (i, mut row) in data.axis_iter_mut(Axis(1)).enumerate() {
+            self.encodings[i].transform_arr(&mut row);
+        }
+    }
+}
+
+impl<D, T> ColumnTargetEncoder<D, T>
+    where
+        T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive + Float + Send,
+        D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive + Send {
+    pub fn fit(data: &Vec<OrderedFloat<D>>, target: &[T]) -> ColumnTargetEncoder<D, T>
         where
             T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive,
             D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive {
@@ -83,7 +73,6 @@ impl<D, T> TargetEncoder<D, T>
         let groups = data_target.into_iter().group_by(|x| *x.0);
 
         // calculate target encoding for each value in data
-        // let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::default();
         let mut encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>> = FnvHashMap::with_capacity_and_hasher(num_groups, Default::default());
 
         for (k, v) in &groups {
@@ -100,11 +89,11 @@ impl<D, T> TargetEncoder<D, T>
             }
         }
 
-        TargetEncoder {encodings, num_groups, phantom_target: PhantomData }
+        ColumnTargetEncoder { encodings, num_groups, phantom_target: PhantomData }
     }
 
     /// create encoded array
-    pub fn transform_vec(&self, data: &mut Vec<OrderedFloat<D>>) {
+    pub fn transform(&self, data: &mut Vec<OrderedFloat<D>>) {
         for x in data.iter_mut() {
             *x = *self.encodings.get(x).unwrap();
         };
@@ -114,11 +103,6 @@ impl<D, T> TargetEncoder<D, T>
         data.map_mut(|x| *x = *self.encodings.get(x).unwrap());
     }
 
-    pub fn transform_mat(&self, data: &mut Array2<OrderedFloat<D>>) {
-        for mut row in data.outer_iter_mut() {
-            self.transform_arr(&mut row);
-        }
-    }
 
     fn compute_encoding(val: &Array1<f64>, count: f64, min_samples_leaf: f64, smoothing: f64, prior: f64) -> f64 {
         let group_mean: f64 = &val.sum() / count as f64;
@@ -129,38 +113,70 @@ impl<D, T> TargetEncoder<D, T>
 }
 
 
-
 #[cfg(test)]
 mod tests {
+    use ndarray::Zip;
+    use numpy::npyffi::array;
+
     use assert_approx_eq::assert_approx_eq;
+
     use super::*;
 
     #[test]
-    fn test_target_encoding() {
-        let a = vec![0., 1., 1., 0., 3., 0., 1.];
-        let mut a = a.to_ordered_float();
-        let b = [1., 2., 2., 1., 0., 1., 2.];
+    fn test_fit_one_column() {
+        let x = vec![0., 1., 1., 0., 3., 0., 1.];
+        let mut x = x.to_ordered_float();
+        let y = [1., 2., 2., 1., 0., 1., 2.];
 
-        let encoder = TargetEncoder::fit_one_column(&a, &b);
-        encoder.transform_vec(&mut a);
+        let encoder = ColumnTargetEncoder::fit(&x, &y);
+        encoder.transform(&mut x);
         // target_encoding(&mut a, &b);
-        let expected = vec![1.0340579777206051, 1.9148550556984874, 1.9148550556984874, 1.0340579777206051, 1.2857142857142858, 1.0340579777206051, 1.9148550556984874];
-        let a = a.iter().map(|x| x.0).collect_vec();
-        expected.iter().zip(a.iter()).map(|(e, a): (&f64, &f64)| {
-            assert_approx_eq!(e, a);
+        let expected = vec![
+            1.0340579777206051, 1.9148550556984874,
+            1.9148550556984874, 1.0340579777206051,
+            1.2857142857142858, 1.0340579777206051,
+            1.9148550556984874];
+        let actual = x.iter().map(|x| x.0).collect_vec();
+        expected.iter().zip(actual.iter()).map(|(expected, actual): (&f64, &f64)| {
+            assert_approx_eq!(expected, actual);
         });
     }
 
     #[test]
-    fn test_par() {
-        let mut a = Array2::<f64>::zeros((10, 7)).mapv(OrderedFloat::from);
-        let b = [1., 2., 2., 1., 0., 1., 2.];
+    fn test_fit_one_category() {
+        let mut x = Array2::<f64>::zeros((10, 7)).mapv(OrderedFloat::from);
+        let y = [1., 2., 2., 1., 0., 1., 2.];
 
-        let encoder = TargetEncoder::fit(&mut a, &b);
-        encoder.transform_mat(&mut a);
+        let encoder = TargetEncoder::fit(&x, &y);
+        encoder.transform(&mut x);
 
-        for r in a.iter() {
+        for r in x.iter() {
             assert_approx_eq!(r.0, 1.2857142857142858);
         }
+    }
+
+    #[test]
+    fn test_fit_compare_category_encoders() {
+        let a = array![[2., 6., 3., 5., 4.],
+                       [3., 2., 2., 5., 3.],
+                       [8., 4., 5., 3., 1.],
+                       [5., 0., 2., 4., 9.],
+                       [9., 5., 2., 0., 7.]];
+
+        let mut a = a.mapv(OrderedFloat::from);
+
+        let b = [0.48263811, 0.16705367, 0.32397016, 0.10172379, 0.54362169];
+        let expected = array![[0.32380149, 0.32380149, 0.32380149, 0.32456501, 0.32380149],
+                              [0.32380149, 0.32380149, 0.27711768, 0.32456501, 0.32380149],
+                              [0.32380149, 0.32380149, 0.32380149, 0.32380149, 0.32380149],
+                              [0.32380149, 0.32380149, 0.27711768, 0.32380149, 0.32380149],
+                              [0.32380149, 0.32380149, 0.27711768, 0.32380149, 0.32380149]];
+
+        let encoder = TargetEncoder::fit(&mut a, &b);
+        encoder.transform(&mut a);
+
+        Zip::from(&a).and(&expected).apply(|&a, &expected| {
+            assert_approx_eq!(a.0, expected);
+        });
     }
 }

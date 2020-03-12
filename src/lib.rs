@@ -9,7 +9,7 @@ use pyo3::wrap_pyfunction;
 use utils::ToOrderedFloat;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use crate::target_encoder::TargetEncoder;
+use crate::target_encoder::{ColumnTargetEncoder, TargetEncoder};
 
 #[pymodule]
 fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -23,8 +23,8 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         let mut data = data.iter().map(|x| OrderedFloat::from(*x)).collect_vec();
         let target = target.as_slice().unwrap();
 
-        let encoder = TargetEncoder::fit_one_column(&data, target);
-        encoder.transform_vec(&mut data);
+        let encoder = ColumnTargetEncoder::fit(&data, target);
+        encoder.transform(&mut data);
         let mut d = data.iter().map(|x| x.0).collect_vec();
         d.into_pyarray(py).to_owned()
     }
@@ -35,7 +35,7 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         let target = target.as_slice().unwrap();
         let data = py.allow_threads(move || {
             let encoder = TargetEncoder::fit(&data, target);
-            encoder.transform_mat(&mut data);
+            encoder.transform(&mut data);
             data
         });
         Array2::from(data).map(|x| x.0).into_pyarray(py).to_owned()

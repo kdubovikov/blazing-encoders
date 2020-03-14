@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 
 use fnv::FnvHashMap;
 use itertools::Itertools;
-use ndarray::IntoNdProducer;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use num_traits::{Float, FromPrimitive, Num, ToPrimitive};
@@ -20,7 +19,6 @@ pub struct TargetEncoder<D, T> where D: Float, T: Float {
 
 pub struct ColumnTargetEncoder<D, T> where D: Float, T: Float {
     encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>>,
-    num_groups: usize,
     phantom_target: PhantomData<T>,
 }
 
@@ -31,9 +29,9 @@ impl<D, T> TargetEncoder<D, T>
     pub fn fit(data: &Array2<OrderedFloat<D>>, target: &[T]) -> TargetEncoder<D, T> {
         let mut encodings: Vec<ColumnTargetEncoder<D, T>> = Vec::with_capacity(data.len_of(Axis(1)));
 
-        data.axis_iter(Axis(1)).into_par_iter().enumerate().map(|(i, row)| {
+        data.axis_iter(Axis(1)).into_par_iter().enumerate().map(|(_, row)| {
             let mut owned_row = row.to_owned();
-            let mut enc = Vec::from(owned_row.as_slice_mut().unwrap());
+            let enc = Vec::from(owned_row.as_slice_mut().unwrap());
             let mut enc = enc.iter().map(|x| OrderedFloat::<D>::from(*x)).collect_vec();
             let encoder = ColumnTargetEncoder::fit(&mut enc, target);
             encoder
@@ -89,7 +87,7 @@ impl<D, T> ColumnTargetEncoder<D, T>
             }
         }
 
-        ColumnTargetEncoder { encodings, num_groups, phantom_target: PhantomData }
+        ColumnTargetEncoder { encodings, phantom_target: PhantomData }
     }
 
     /// create encoded array
@@ -116,11 +114,11 @@ impl<D, T> ColumnTargetEncoder<D, T>
 #[cfg(test)]
 mod tests {
     use ndarray::Zip;
-    use numpy::npyffi::array;
 
     use assert_approx_eq::assert_approx_eq;
 
     use super::*;
+    use numpy::npyffi::array;
 
     #[test]
     fn test_fit_one_column() {
@@ -137,7 +135,7 @@ mod tests {
             1.2857142857142858, 1.0340579777206051,
             1.9148550556984874];
         let actual = x.iter().map(|x| x.0).collect_vec();
-        expected.iter().zip(actual.iter()).map(|(expected, actual): (&f64, &f64)| {
+        expected.iter().zip(actual.iter()).for_each(|(expected, actual): (&f64, &f64)| {
             assert_approx_eq!(expected, actual);
         });
     }

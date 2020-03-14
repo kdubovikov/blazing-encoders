@@ -28,9 +28,13 @@ pub fn benchmark_column_target_encoder(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn benchmark_target_encoder(c: &mut Criterion) {
+    
+}
+
 criterion_group! {
     name = benches;
-    config = Criterion::default().sample_size(20);
+    config = Criterion::default().sample_size(30);
     targets = benchmark_column_target_encoder
 }
 

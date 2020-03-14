@@ -1,18 +1,18 @@
+use itertools::Itertools;
+use ndarray::Array2;
+use numpy::{IntoPyArray, PyArray, PyArray1, PyArray2, PyArrayDyn};
+use ordered_float::OrderedFloat;
+use pyo3::prelude::*;
+use ndarray::Dim;
+
+use crate::target_encoder::{ColumnTargetEncoder, TargetEncoder};
+
 pub mod target_encoder;
 pub mod utils;
 
-use ndarray::{ArrayD, ArrayViewD, ArrayViewMutD, Dim, Axis, Array2};
-use numpy::{IntoPyArray, PyArrayDyn, PyArray, PyArray2, PyArray1};
-use pyo3::prelude::*;
-use pyo3::wrap_pyfunction;
-
-use utils::ToOrderedFloat;
-use itertools::Itertools;
-use ordered_float::OrderedFloat;
-use crate::target_encoder::{ColumnTargetEncoder, TargetEncoder};
-
 macro_rules! create_target_encoder_class {
     ($name:ident, $type:ty) => {
+        #[allow(non_camel_case_types)]
         #[pyclass]
         struct $name {
             encoder: TargetEncoder<$type, $type>
@@ -22,7 +22,7 @@ macro_rules! create_target_encoder_class {
         impl $name {
             #[staticmethod]
             fn fit(py: Python, data: &PyArray2<$type>, target: &PyArray1<$type>) -> Self {
-                let mut data = data.as_array_mut().mapv::<OrderedFloat<$type>, _>(OrderedFloat::from);
+                let data = data.as_array_mut().mapv::<OrderedFloat<$type>, _>(OrderedFloat::from);
                 let target = target.as_slice().unwrap();
                 let encoder = py.allow_threads(move || {
                     TargetEncoder::fit(&data, target)
@@ -46,8 +46,8 @@ create_target_encoder_class!(TargetEncoder_f32, f32);
 
 #[pymodule]
 fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<TargetEncoder_f64>();
-    m.add_class::<TargetEncoder_f32>();
+    m.add_class::<TargetEncoder_f64>().expect("Error adding class to python module");
+    m.add_class::<TargetEncoder_f32>().expect("Error adding class to python module");
 
     #[pyfn(m, "target_encoding")]
     fn target_encoding_py(
@@ -55,13 +55,13 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         data: &PyArrayDyn<f64>,
         target: &PyArrayDyn<f64>,
     ) -> Py<PyArray<f64, Dim<[usize; 1]>>> {
-        let mut data = data.as_slice_mut().unwrap();
+        let data = data.as_slice_mut().unwrap();
         let mut data = data.iter().map(|x| OrderedFloat::from(*x)).collect_vec();
         let target = target.as_slice().unwrap();
 
         let encoder = ColumnTargetEncoder::fit(&data, target);
         encoder.transform(&mut data);
-        let mut d = data.iter().map(|x| x.0).collect_vec();
+        let d = data.iter().map(|x| x.0).collect_vec();
         d.into_pyarray(py).to_owned()
     }
 

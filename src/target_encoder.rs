@@ -24,8 +24,8 @@ pub struct ColumnTargetEncoder<D, T> where D: Float, T: Float {
 
 impl<D, T> TargetEncoder<D, T>
     where
-        T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive + Float + Send,
-        D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive + Send {
+        T: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
+        D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send {
     pub fn fit(data: &Array2<OrderedFloat<D>>, target: &[T]) -> TargetEncoder<D, T> {
         let mut encodings: Vec<ColumnTargetEncoder<D, T>> = Vec::with_capacity(data.len_of(Axis(1)));
 
@@ -49,12 +49,9 @@ impl<D, T> TargetEncoder<D, T>
 
 impl<D, T> ColumnTargetEncoder<D, T>
     where
-        T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive + Float + Send,
-        D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive + Send {
-    pub fn fit(data: &Vec<OrderedFloat<D>>, target: &[T]) -> ColumnTargetEncoder<D, T>
-        where
-            T: Num + Copy + FromPrimitive + Sync + ToPrimitive + Debug + Sum + FromPrimitive,
-            D: Float + Sync + Debug + Sum + ToPrimitive + FromPrimitive {
+        T: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
+        D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send {
+    pub fn fit(data: &Vec<OrderedFloat<D>>, target: &[T]) -> ColumnTargetEncoder<D, T> {
         let smoothing = 1.0;
         let min_samples_leaf = 1.;
 

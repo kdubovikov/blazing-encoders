@@ -1,3 +1,62 @@
+//! A parallel implementation of target encoding algorithm for categorical variables.
+//! # About
+//! The algorithm and implementation is highly inspored by
+//! [category_encoders](https://contrib.scikit-learn.org/categorical-encoding/) Python library.
+//! This Rust implementation uses parallel operations to perform target encoding.
+//! It is faster and more memory efficient than Python implementation.
+//! `blazing_encoders` also present a Python API similar to `category_encoders`.
+//!
+//! # Installation
+//! ## Rust
+//! Add `blazing_ecnoders` to your `Cargo.toml`
+//! ```toml
+//! [dependencies]
+//! blazing_encoders = "0.1.0"
+//! ```
+//!
+//! ## Python
+//! You can build the Python wheel from source using [maturin](https://github.com/PyO3/maturin):
+//! ```bash
+//! maturin build --release
+//! pip install -U ./target/wheels/wheel_file_name.whl
+//! ```
+//!
+//! # Usage
+//! ## Rust API
+//! ```rust
+//! use numpy::npyffi::array;
+//! use blazing_encoders::target_encoder::TargetEncoder;
+//! let data = array![[2., 6., 3., 5., 4.],
+//!                   [3., 2., 2., 5., 3.],
+//!                   [8., 4., 5., 3., 1.],
+//!                   [5., 0., 2., 4., 9.],
+//!                   [9., 5., 2., 0., 7.]];
+//!
+//! let mut data = a.mapv(OrderedFloat::from);
+//! let target = [0.48263811, 0.16705367, 0.32397016, 0.10172379, 0.54362169];
+//!
+//! let encoder = TargetEncoder::fit(&mut a, &b);
+//! encoder.transform(&mut a);
+//! ```
+//!
+//! ## Python API
+//! Currently, the Python API supports only float32 and float64 data and targets,
+//! so you might need to convert your matrices before the encoding.
+//!
+//! ```python
+//! import blazing_encoders as be
+//! import numpy as np
+//!
+//! data = np.random.randint(0, 10, (5,5))
+//! target = np.random.rand(5)
+//!
+//! encoder = be.TargetEncoder_f64.fit(data, target) # you can use TargetEncoder_f32 for float32 data
+//! encoded_data = encoder.transform(a)
+//! ```
+//!
+//! # Limitations
+//! * Currently, only the basic target encoding is implemented
+//! * The library supports only continuous target variables. As a result, it can be used only in regression settings.
 use itertools::Itertools;
 use ndarray::Array2;
 use numpy::{IntoPyArray, PyArray, PyArray1, PyArray2, PyArrayDyn};

@@ -12,11 +12,15 @@ use rayon::prelude::*;
 
 use crate::utils::ToOrderedFloat;
 
+/// Target encoding for multiple columns
 pub struct TargetEncoder<D, T> where D: Float, T: Float {
     encodings: Vec<ColumnTargetEncoder<D, T>>,
     phantom_target: PhantomData<T>,
 }
 
+/// Target encoding on single column.
+///
+/// The research paper describing the algorithm can be found here: [A preprocessing scheme for high-cardinality categorical attributes in classification and prediction problems](https://dl.acm.org/doi/10.1145/507533.507538)
 pub struct ColumnTargetEncoder<D, T> where D: Float, T: Float {
     encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>>,
     phantom_target: PhantomData<T>,
@@ -26,6 +30,8 @@ impl<D, T> TargetEncoder<D, T>
     where
         T: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
         D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send {
+    /// Create a new `TargetEncoder` and compute target encodings for all columns.
+    /// This function does not transform the original dataset. See [`transform`](TargetEncoder::transform)
     pub fn fit(data: &Array2<OrderedFloat<D>>, target: &[T]) -> TargetEncoder<D, T> {
         let mut encodings: Vec<ColumnTargetEncoder<D, T>> = Vec::with_capacity(data.len_of(Axis(1)));
 
@@ -40,6 +46,7 @@ impl<D, T> TargetEncoder<D, T>
         TargetEncoder { encodings, phantom_target: PhantomData }
     }
 
+    /// Performs target encoding on provided `data`
     pub fn transform(&self, data: &mut Array2<OrderedFloat<D>>) {
         for (i, mut row) in data.axis_iter_mut(Axis(1)).enumerate() {
             self.encodings[i].transform_arr(&mut row);
@@ -51,6 +58,8 @@ impl<D, T> ColumnTargetEncoder<D, T>
     where
         T: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
         D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send {
+    /// Create new `ColumnTargetEncoder` and compute target encodings for a single column.
+    /// This function does not transform the original dataset. See [`transform`](ColumnTargetEncoder::transform)
     pub fn fit(data: &Vec<OrderedFloat<D>>, target: &[T]) -> ColumnTargetEncoder<D, T> {
         let smoothing = 1.0;
         let min_samples_leaf = 1.;
@@ -87,13 +96,14 @@ impl<D, T> ColumnTargetEncoder<D, T>
         ColumnTargetEncoder { encodings, phantom_target: PhantomData }
     }
 
-    /// create encoded array
+    /// Encode provided `data`. If you need to transform an `ndarray` see [transform_arr](ColumnTargetEncoder::transform_arr).
     pub fn transform(&self, data: &mut Vec<OrderedFloat<D>>) {
         for x in data.iter_mut() {
             *x = *self.encodings.get(x).unwrap();
         };
     }
 
+    /// Encode provided `data`
     pub fn transform_arr(&self, data: &mut ArrayViewMut1<OrderedFloat<D>>) {
         data.map_mut(|x| *x = *self.encodings.get(x).unwrap());
     }
@@ -111,11 +121,11 @@ impl<D, T> ColumnTargetEncoder<D, T>
 #[cfg(test)]
 mod tests {
     use ndarray::Zip;
+    use numpy::npyffi::array;
 
     use assert_approx_eq::assert_approx_eq;
 
     use super::*;
-    use numpy::npyffi::array;
 
     #[test]
     fn test_fit_one_column() {

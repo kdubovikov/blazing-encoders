@@ -111,6 +111,7 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TargetEncoder_f64>().expect("Error adding class to python module");
     m.add_class::<TargetEncoder_f32>().expect("Error adding class to python module");
 
+    #[deprecated]
     #[pyfn(m, "target_encoding")]
     fn target_encoding_py(
         py: Python,
@@ -127,6 +128,7 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         d.into_pyarray(py).to_owned()
     }
 
+    #[deprecated]
     #[pyfn(m, "par_column_target_encoding")]
     fn par_column_target_encoding_py(py: Python, data: &PyArray2<f64>, target: &PyArray1<f64>) -> Py<PyArray2<f64>> {
         let mut data = data.as_array_mut().mapv::<OrderedFloat<f64>, _>(OrderedFloat::from);

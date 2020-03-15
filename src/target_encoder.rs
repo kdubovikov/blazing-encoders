@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::iter::Sum;
 use std::marker::PhantomData;
 
@@ -6,7 +5,7 @@ use fnv::FnvHashMap;
 use itertools::Itertools;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use num_traits::{Float, FromPrimitive, Num, ToPrimitive};
+use num_traits::{Float, FromPrimitive, ToPrimitive};
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
 
@@ -15,6 +14,8 @@ use crate::utils::ToOrderedFloat;
 /// Target encoding for multiple columns
 pub struct TargetEncoder<D, T> where D: Float, T: Float {
     encodings: Vec<ColumnTargetEncoder<D, T>>,
+    smoothing: f64,
+    min_samples_leaf: usize,
     phantom_target: PhantomData<T>,
 }
 
@@ -23,6 +24,8 @@ pub struct TargetEncoder<D, T> where D: Float, T: Float {
 /// The research paper describing the algorithm can be found here: [A preprocessing scheme for high-cardinality categorical attributes in classification and prediction problems](https://dl.acm.org/doi/10.1145/507533.507538)
 pub struct ColumnTargetEncoder<D, T> where D: Float, T: Float {
     encodings: FnvHashMap<OrderedFloat<D>, OrderedFloat<D>>,
+    smoothing: f64,
+    min_samples_leaf: usize,
     phantom_target: PhantomData<T>,
 }
 
@@ -32,18 +35,18 @@ impl<D, T> TargetEncoder<D, T>
         D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send {
     /// Create a new `TargetEncoder` and compute target encodings for all columns.
     /// This function does not transform the original dataset. See [`transform`](TargetEncoder::transform)
-    pub fn fit(data: &Array2<OrderedFloat<D>>, target: &[T]) -> TargetEncoder<D, T> {
+    pub fn fit(data: &Array2<OrderedFloat<D>>, target: &[T], smoothing: f64, min_samples_leaf: usize) -> TargetEncoder<D, T> {
         let mut encodings: Vec<ColumnTargetEncoder<D, T>> = Vec::with_capacity(data.len_of(Axis(1)));
 
         data.axis_iter(Axis(1)).into_par_iter().enumerate().map(|(_, row)| {
             let mut owned_row = row.to_owned();
             let enc = Vec::from(owned_row.as_slice_mut().unwrap());
             let mut enc = enc.iter().map(|x| OrderedFloat::<D>::from(*x)).collect_vec();
-            let encoder = ColumnTargetEncoder::fit(&mut enc, target);
+            let encoder = ColumnTargetEncoder::fit(&mut enc, target, smoothing, min_samples_leaf);
             encoder
         }).collect_into_vec(&mut encodings);
 
-        TargetEncoder { encodings, phantom_target: PhantomData }
+        TargetEncoder { encodings, smoothing, min_samples_leaf, phantom_target: PhantomData }
     }
 
     /// Performs target encoding on provided `data`
@@ -60,9 +63,7 @@ impl<D, T> ColumnTargetEncoder<D, T>
         D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send {
     /// Create new `ColumnTargetEncoder` and compute target encodings for a single column.
     /// This function does not transform the original dataset. See [`transform`](ColumnTargetEncoder::transform)
-    pub fn fit(data: &Vec<OrderedFloat<D>>, target: &[T]) -> ColumnTargetEncoder<D, T> {
-        let smoothing = 1.0;
-        let min_samples_leaf = 1.;
+    pub fn fit(data: &Vec<OrderedFloat<D>>, target: &[T], smoothing: f64, min_samples_leaf: usize) -> ColumnTargetEncoder<D, T> {
 
         // group targets by each item in data
         let mut data_target: Vec<_> = data.iter().zip(target).collect(); // TODO array instead of vec
@@ -93,7 +94,7 @@ impl<D, T> ColumnTargetEncoder<D, T>
             }
         }
 
-        ColumnTargetEncoder { encodings, phantom_target: PhantomData }
+        ColumnTargetEncoder { encodings, smoothing, min_samples_leaf, phantom_target: PhantomData }
     }
 
     /// Encode provided `data`. If you need to transform an `ndarray` see [transform_arr](ColumnTargetEncoder::transform_arr).
@@ -109,7 +110,7 @@ impl<D, T> ColumnTargetEncoder<D, T>
     }
 
 
-    fn compute_encoding(val: &Array1<f64>, count: f64, min_samples_leaf: f64, smoothing: f64, prior: f64) -> f64 {
+    fn compute_encoding(val: &Array1<f64>, count: f64, min_samples_leaf: usize, smoothing: f64, prior: f64) -> f64 {
         let group_mean: f64 = &val.sum() / count as f64;
         let exp_count: f64 = -(count as f64 - min_samples_leaf as f64) / smoothing;
         let smoove: f64 = 1.0 / (1.0 + exp_count.exp());
@@ -133,7 +134,7 @@ mod tests {
         let mut x = x.to_ordered_float();
         let y = [1., 2., 2., 1., 0., 1., 2.];
 
-        let encoder = ColumnTargetEncoder::fit(&x, &y);
+        let encoder = ColumnTargetEncoder::fit(&x, &y, 1.0, 1);
         encoder.transform(&mut x);
         // target_encoding(&mut a, &b);
         let expected = vec![
@@ -152,7 +153,7 @@ mod tests {
         let mut x = Array2::<f64>::zeros((10, 7)).mapv(OrderedFloat::from);
         let y = [1., 2., 2., 1., 0., 1., 2.];
 
-        let encoder = TargetEncoder::fit(&x, &y);
+        let encoder = TargetEncoder::fit(&x, &y, 1.0, 1);
         encoder.transform(&mut x);
 
         for r in x.iter() {
@@ -177,7 +178,7 @@ mod tests {
                               [0.32380149, 0.32380149, 0.27711768, 0.32380149, 0.32380149],
                               [0.32380149, 0.32380149, 0.27711768, 0.32380149, 0.32380149]];
 
-        let encoder = TargetEncoder::fit(&mut a, &b);
+        let encoder = TargetEncoder::fit(&mut a, &b, 1.0, 1);
         encoder.transform(&mut a);
 
         Zip::from(&a).and(&expected).apply(|&a, &expected| {

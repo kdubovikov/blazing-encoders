@@ -24,19 +24,21 @@
 //! # Usage
 //! ## Rust API
 //! ```rust
-//! use numpy::npyffi::array;
+//! use ndarray::prelude::*;
+//! use ordered_float::OrderedFloat;
 //! use blazing_encoders::target_encoder::TargetEncoder;
+//!
 //! let data = array![[2., 6., 3., 5., 4.],
 //!                   [3., 2., 2., 5., 3.],
 //!                   [8., 4., 5., 3., 1.],
 //!                   [5., 0., 2., 4., 9.],
 //!                   [9., 5., 2., 0., 7.]];
 //!
-//! let mut data = a.mapv(OrderedFloat::from);
+//! let mut data = data.mapv(OrderedFloat::from);
 //! let target = [0.48263811, 0.16705367, 0.32397016, 0.10172379, 0.54362169];
 //!
-//! let encoder = TargetEncoder::fit(&mut a, &b);
-//! encoder.transform(&mut a);
+//! let encoder = TargetEncoder::fit(&data, &target, 1.0, 1);
+//! encoder.transform(&mut data);
 //! ```
 //!
 //! ## Python API
@@ -47,11 +49,11 @@
 //! import blazing_encoders as be
 //! import numpy as np
 //!
-//! data = np.random.randint(0, 10, (5,5))
+//! data = np.random.randint(0, 10, (5, 5)).astype('float')
 //! target = np.random.rand(5)
 //!
 //! encoder = be.TargetEncoder_f64.fit(data, target) # you can use TargetEncoder_f32 for float32 data
-//! encoded_data = encoder.transform(a)
+//! encoded_data = encoder.transform(data)
 //! ```
 //!
 //! # Limitations
@@ -80,11 +82,12 @@ macro_rules! create_target_encoder_class {
         #[pymethods]
         impl $name {
             #[staticmethod]
-            fn fit(py: Python, data: &PyArray2<$type>, target: &PyArray1<$type>) -> Self {
+            #[args(smoothing="1.0", min_samples_leaf="2")]
+            fn fit(py: Python, data: &PyArray2<$type>, target: &PyArray1<$type>, smoothing:f64, min_samples_leaf: usize) -> Self {
                 let data = data.as_array_mut().mapv::<OrderedFloat<$type>, _>(OrderedFloat::from);
                 let target = target.as_slice().unwrap();
                 let encoder = py.allow_threads(move || {
-                    TargetEncoder::fit(&data, target)
+                    TargetEncoder::fit(&data, target, smoothing, min_samples_leaf)
                 });
 
                 $name { encoder }
@@ -118,7 +121,7 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         let mut data = data.iter().map(|x| OrderedFloat::from(*x)).collect_vec();
         let target = target.as_slice().unwrap();
 
-        let encoder = ColumnTargetEncoder::fit(&data, target);
+        let encoder = ColumnTargetEncoder::fit(&data, target, 1.0, 2);
         encoder.transform(&mut data);
         let d = data.iter().map(|x| x.0).collect_vec();
         d.into_pyarray(py).to_owned()
@@ -129,7 +132,7 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         let mut data = data.as_array_mut().mapv::<OrderedFloat<f64>, _>(OrderedFloat::from);
         let target = target.as_slice().unwrap();
         let data = py.allow_threads(move || {
-            let encoder = TargetEncoder::fit(&data, target);
+            let encoder = TargetEncoder::fit(&data, target, 1.0, 2);
             encoder.transform(&mut data);
             data
         });

@@ -8,11 +8,14 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
-    container:
-      image: konstin2/maturin:master
-      volumes:
-        - .:/io
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macOS-latest]
+      runs-on: ${{ matrix.platform }}
+#    container:
+#      image: konstin2/maturin:master
+#      volumes:
+#        - .:/io
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v1
@@ -31,8 +34,8 @@ jobs:
       run: cargo test --verbose
     - name: Build Python wheel
       run: |
-        pip install -U maturin
-        maturin build
+        pip install -U cffi maturin
+        maturin build --release
     - name: Upload wheel as artifacts
       uses: actions/upload-artifact@master
       with:

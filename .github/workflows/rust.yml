@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, macOS-latest]
-      runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
 #    container:
 #      image: konstin2/maturin:master
 #      volumes:

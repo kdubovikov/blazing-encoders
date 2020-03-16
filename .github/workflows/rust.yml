@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-18.04
-    container: konstin2/maturin
+    container: quay.io/pypa/manylinux1_x86_64
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v1

@@ -9,7 +9,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-18.04
-    container: quay.io/pypa/manylinux1_x86_64
+    container:
+      image: konstin2/maturin:master
+      volumes:
+        - .:/io
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v1

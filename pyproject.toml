@@ -1,9 +1,8 @@
 [build-system]
-requires = ["maturin", "cffi"]
+requires = ["maturin"]
 build-backend = "maturin"
 
 [tool.maturin]
-#bindings = "cffi"
 manylinux = "off"
 
 [package.metadata.maturin]

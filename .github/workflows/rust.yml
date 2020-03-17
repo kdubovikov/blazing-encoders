@@ -35,10 +35,14 @@ jobs:
       run: cargo test --verbose
     - name: Build Python wheel
       run: |
-        pip install -U cffi maturin .
+        pip install -U maturin .
         maturin build --release
     - name: Upload wheel as artifacts
       uses: actions/upload-artifact@master
       with:
         name: wheels
         path: target/wheels/
+    - name: Run examples
+      run: |
+        pip install target/wheels/*.whl
+        python examples/example.py

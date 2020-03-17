@@ -3,7 +3,7 @@ requires = ["maturin", "cffi"]
 build-backend = "maturin"
 
 [tool.maturin]
-bindings = "cffi"
+#bindings = "cffi"
 manylinux = "off"
 
 [package.metadata.maturin]

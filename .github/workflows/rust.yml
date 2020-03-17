@@ -28,6 +28,7 @@ jobs:
       with:
         toolchain: nightly
         override: true
+        default: true
     - name: Build
       run: cargo build --verbose
     - name: Run tests

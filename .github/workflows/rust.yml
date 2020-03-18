@@ -44,6 +44,6 @@ jobs:
         path: target/wheels/
     - name: Run examples
       run: |
-        pip install -e examples/requirements.txt
+        pip install -r examples/requirements.txt
         pip install target/wheels/*.whl
         python examples/example.py

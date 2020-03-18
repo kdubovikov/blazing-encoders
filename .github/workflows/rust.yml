@@ -36,7 +36,7 @@ jobs:
     - name: Build Python wheel
       run: |
         pip install -U maturin
-        maturin build --release --manylinux=off --bindings=pyo3
+        maturin build --release --manylinux=off --bindings=pyo3 -i python3.6
     - name: Upload wheel as artifacts
       uses: actions/upload-artifact@master
       with:
@@ -46,4 +46,4 @@ jobs:
       run: |
         pip install -r examples/requirements.txt
         pip install target/wheels/*.whl
-        python examples/example.py
+        python3.6 examples/example.py

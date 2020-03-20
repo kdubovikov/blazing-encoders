@@ -26,7 +26,7 @@
 //! ```rust
 //! use ndarray::prelude::*;
 //! use ordered_float::OrderedFloat;
-//! use blazing_encoders::target_encoder::TargetEncoder;
+//! use blazing_encoders::target_encoder::{MatrixEncoder, Encoders};
 //!
 //! let data = array![[2., 6., 3., 5., 4.],
 //!                   [3., 2., 2., 5., 3.],
@@ -37,7 +37,7 @@
 //! let mut data = data.mapv(OrderedFloat::from);
 //! let target = [0.48263811, 0.16705367, 0.32397016, 0.10172379, 0.54362169];
 //!
-//! let encoder = TargetEncoder::fit(&data, &target, 1.0, 1);
+//! let encoder = MatrixEncoder::fit(&data, &target, &Encoders::TargetEncoder {min_samples_leaf: 1, smoothing: 1.0});
 //! encoder.transform(&mut data);
 //! ```
 //!
@@ -66,17 +66,18 @@ use ordered_float::OrderedFloat;
 use pyo3::prelude::*;
 use ndarray::Dim;
 
-use crate::target_encoder::{ColumnTargetEncoder, TargetEncoder};
+use crate::target_encoder::{ColumnTargetEncoder, MatrixEncoder, Encoders};
 
 pub mod target_encoder;
 pub mod utils;
+
 
 macro_rules! create_target_encoder_class {
     ($name:ident, $type:ty) => {
         #[allow(non_camel_case_types)]
         #[pyclass]
         struct $name {
-            encoder: TargetEncoder<$type, $type>
+            encoder: MatrixEncoder<$type, $type>
         }
 
         #[pymethods]
@@ -87,7 +88,7 @@ macro_rules! create_target_encoder_class {
                 let data = data.as_array_mut().mapv::<OrderedFloat<$type>, _>(OrderedFloat::from);
                 let target = target.as_slice().unwrap();
                 let encoder = py.allow_threads(move || {
-                    TargetEncoder::fit(&data, target, smoothing, min_samples_leaf)
+                    MatrixEncoder::fit(&data, target, &Encoders::<$type>::TargetEncoder { smoothing: smoothing as $type, min_samples_leaf })
                 });
 
                 $name { encoder }
@@ -109,7 +110,7 @@ create_target_encoder_class!(TargetEncoder_f32, f32);
 #[pymodule]
 fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TargetEncoder_f64>().expect("Error adding class to python module");
-    m.add_class::<TargetEncoder_f32>().expect("Error adding class to python module");
+    // m.add_class::<TargetEncoder_f32>().expect("Error adding class to python module");
 
     #[deprecated]
     #[pyfn(m, "target_encoding")]
@@ -122,7 +123,7 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         let mut data = data.iter().map(|x| OrderedFloat::from(*x)).collect_vec();
         let target = target.as_slice().unwrap();
 
-        let encoder = ColumnTargetEncoder::fit(&data, target, 1.0, 2);
+        let encoder = ColumnTargetEncoder::fit(&data, target, &Encoders::TargetEncoder {min_samples_leaf: 1, smoothing: 1.0});
         encoder.transform(&mut data);
         let d = data.iter().map(|x| x.0).collect_vec();
         d.into_pyarray(py).to_owned()
@@ -134,7 +135,7 @@ fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
         let mut data = data.as_array_mut().mapv::<OrderedFloat<f64>, _>(OrderedFloat::from);
         let target = target.as_slice().unwrap();
         let data = py.allow_threads(move || {
-            let encoder = TargetEncoder::fit(&data, target, 1.0, 2);
+            let encoder = MatrixEncoder::fit(&data, target, &Encoders::TargetEncoder {min_samples_leaf: 1, smoothing: 1.0});
             encoder.transform(&mut data);
             data
         });

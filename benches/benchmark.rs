@@ -7,7 +7,7 @@ use rand::{Rng, thread_rng};
 use rand::distributions::{Distribution, Uniform};
 use rand::distributions::uniform::UniformInt;
 
-use blazing_encoders::target_encoder::{TargetEncoder, ColumnTargetEncoder};
+use blazing_encoders::target_encoder::{MatrixEncoder, ColumnTargetEncoder};
 use blazing_encoders::utils::{gen_array, gen_array_f32, ToOrderedFloat};
 
 pub fn benchmark_column_target_encoder(c: &mut Criterion) {

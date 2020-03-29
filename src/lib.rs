@@ -59,6 +59,7 @@
 //! # Limitations
 //! * Currently, only the basic target encoding is implemented
 //! * The library supports only continuous target variables. As a result, it can be used only in regression settings.
+#![feature(trait_alias)]
 use itertools::Itertools;
 use ndarray::Array2;
 use numpy::{IntoPyArray, PyArray, PyArray1, PyArray2, PyArrayDyn};
@@ -70,6 +71,7 @@ use crate::target_encoder::{ColumnTargetEncoder, MatrixEncoder, Encoders};
 
 pub mod target_encoder;
 pub mod utils;
+mod stats;
 
 
 macro_rules! create_target_encoder_class {

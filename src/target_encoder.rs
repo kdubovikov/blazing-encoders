@@ -26,16 +26,20 @@ pub struct ColumnTargetEncoder<D, T> where D: Float, T: Float {
 }
 
 pub enum Encoders<T> where T: Float {
-    TargetEncoder {min_samples_leaf: usize, smoothing: T}
+    TargetEncoder {min_samples_leaf: usize, smoothing: T},
+    JamesSteinEncoder { sigma: T }
 }
 
 fn compute_encoding<T>(encoder: &Encoders<T>, val: &Array1<T>, count: T, prior: T) -> T where T: Float + FromPrimitive {
     match *encoder {
         Encoders::TargetEncoder {min_samples_leaf, smoothing} => {
-            let group_mean = val.sum() / count;
+            let group_mean = val.mean().unwrap();
             let exp_count = -(count - T::from(min_samples_leaf).unwrap()) / smoothing;
             let smoove = T::one() / (T::one() + exp_count.exp());
             prior * (T::one() - smoove) + group_mean * smoove
+        },
+        Encoders::JamesSteinEncoder {sigma} => {
+            unimplemented!();
         }
     }
 
@@ -54,8 +58,7 @@ impl<D, T> MatrixEncoder<D, T>
             let mut owned_row = row.to_owned();
             let enc = Vec::from(owned_row.as_slice_mut().unwrap());
             let mut enc = enc.iter().map(|x| OrderedFloat::<D>::from(*x)).collect_vec();
-            let encoder = ColumnTargetEncoder::fit(&mut enc, target, encoder);
-            encoder
+            ColumnTargetEncoder::fit(&mut enc, target, encoder)
         }).collect_into_vec(&mut encodings);
 
         MatrixEncoder { encodings, phantom_target: PhantomData }
@@ -76,7 +79,6 @@ impl<D, T> ColumnTargetEncoder<D, T>
     /// Create new `ColumnTargetEncoder` and compute target encodings for a single column.
     /// This function does not transform the original dataset. See [`transform`](ColumnTargetEncoder::transform)
     pub fn fit(data: &Vec<OrderedFloat<D>>, target: &[T], encoder: &Encoders<D>) -> ColumnTargetEncoder<D, T> {
-
         // group targets by each item in data
         let mut data_target: Vec<_> = data.iter().zip(target).collect(); // TODO array instead of vec
         data_target.par_sort_unstable_by_key(|x| *x.0);
@@ -85,7 +87,7 @@ impl<D, T> ColumnTargetEncoder<D, T>
         let num_groups: usize = d.into_iter().map(|x| *x).dedup().count();
 
         let sum = D::from(data_target.iter().map(|x| *x.1).sum::<T>()).unwrap();
-        let prior = sum / D::from(target.len()).unwrap();
+        let prior = sum / D::from(target.len()).unwrap(); // TODO this can be pushed up to MatrixEncoder
 
         let groups = data_target.into_iter().group_by(|x| *x.0);
 
@@ -101,7 +103,6 @@ impl<D, T> ColumnTargetEncoder<D, T>
             if count == 1 {
                 encodings.insert(k, OrderedFloat::from(prior));
             } else {
-                // let encoding = Self::compute_encoding(&val, count as f64, min_samples_leaf, smoothing, prior);
                 let encoding = compute_encoding(encoder, &val, D::from_usize(count).unwrap(), prior);
                 encodings.insert(k, OrderedFloat::from(encoding));
             }

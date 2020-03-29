@@ -2,47 +2,11 @@ use num_traits::{Float, FromPrimitive};
 use std::iter::Sum;
 use ndarray::{Array1};
 
-// trait StatFloat = Float + Sum + FromPrimitive;
-
 trait SummaryStatistics<T: Float + Sum + FromPrimitive> {
     // fn mean(&self) -> Option<T>;
     fn var(&self, ddof: T) -> T;
     fn std(&self, ddof: T) -> T;
 }
-
-// impl<T: Float + Sum + FromPrimitive> SummaryStatistics<T> for Vec<T> {
-//     fn mean(&self) -> Option<T> {
-//         let sum: T = self.iter().map(|&x| x).sum();
-//         let count = T::from_usize(self.len()).unwrap();
-
-//         match count {
-//             positive if positive > T::zero() => Some(sum / count),
-//             _ => None,
-//         }
-//     }
-
-//     fn var(&self, ddof: T) -> Option<T> {
-//         match (Self::mean(self), self.len()) {
-//             (Some(data_mean), count) if count > 0 => {
-//                 let variance = self.iter().map(|value| {
-//                     let diff = data_mean - (*value);
-//                     diff * diff
-//                 }).sum::<T>() / T::from_usize(count).unwrap();
-//                 Some(variance)
-//             },
-//             _ => None
-//         }
-//     }
-
-//     fn std(&self, ddof: T) -> Option<T> {
-//         match Self::var(self, ddof) {
-//             Some(variance) => {
-//                 Some(variance.sqrt())
-//             },
-//             _ => None
-//         }
-//     }
-// }
 
 impl<T: Float + Sum + FromPrimitive> SummaryStatistics<T> for Array1<T> {
     fn var(&self, ddof: T) -> T { 
@@ -90,25 +54,4 @@ mod tests {
         let stddev = a.std(1.);
        assert_approx_eq!(stddev, 2.59483, 1e-4);
     }
-
-    // #[test]
-    // fn test_mean() {
-    //     let data = vec![0., 1., 1.25, 52.];
-    //     let mean = data.mean().unwrap();
-    //     assert_approx_eq!(mean, 13.5625);
-    // }
-
-    // #[test]
-    // fn test_std() {
-    //     let data = vec![0., 1., 1.25, 52.];
-    //     let std = data.std(0.).unwrap();
-    //     assert_approx_eq!(std, 22.196829024660257)
-    // }
-
-    // #[test]
-    // fn test_var() {
-    //     let data = vec![0., 1., 1.25, 52.];
-    //     let var = data.var(0.).unwrap();
-    //     assert_approx_eq!(var, 492.69921875);
-    // }
 }

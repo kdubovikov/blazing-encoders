@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ndarray::Array2;
+use ndarray::{Array2, Array1};
 use num_traits::{AsPrimitive, Float, Num};
 use ordered_float::OrderedFloat;
 use rand::prelude::Distribution;
@@ -8,36 +8,36 @@ use rand::thread_rng;
 
 pub trait ToOrderedFloat<T>: where T: Float {
     /// Covert a vector of floats to a vector of OrderedFloat
-    fn to_ordered_float(&self) -> Vec<OrderedFloat<T>>;
+    fn to_ordered_float(&self) -> Array1<OrderedFloat<T>>;
 }
 
-impl ToOrderedFloat<f32> for Vec<f32> {
+impl ToOrderedFloat<f32> for Array1<f32> {
     /// Covert a vector of floats to a vector of OrderedFloat
     /// # Example
     /// ```
     /// use blazing_encoders::utils::ToOrderedFloat;
     /// use ordered_float::OrderedFloat;
-    /// use itertools::Itertools;
-    /// let v = Vec::<f32>::new();
-    /// let v_ordered: Vec<OrderedFloat<f32>> = v.to_ordered_float();
+    /// use ndarray::Array1;
+    /// let v = Array1::<f32>::new();
+    /// let v_ordered: Array1<OrderedFloat<f32>> = v.to_ordered_float();
     /// ```
-    fn to_ordered_float(&self) -> Vec<OrderedFloat<f32>> {
-        self.into_iter().map(|x| OrderedFloat(*x)).collect_vec()
+    fn to_ordered_float(&self) -> Array1<OrderedFloat<f32>> {
+        self.map(|x| OrderedFloat(*x))
     }
 }
 
-impl ToOrderedFloat<f64> for Vec<f64> {
+impl ToOrderedFloat<f64> for Array1<f64> {
     /// Covert a vector of floats to a vector of OrderedFloat
     /// # Example
     /// ```
     /// use blazing_encoders::utils::ToOrderedFloat;
     /// use ordered_float::OrderedFloat;
-    /// use itertools::Itertools;
-    /// let v = Vec::<f64>::new();
-    /// let v_ordered: Vec<OrderedFloat<f64>> = v.to_ordered_float();
+    /// use ndarray::Array1;
+    /// let v = Array1::<f64>::new();
+    /// let v_ordered: Array1<OrderedFloat<f64>> = v.to_ordered_float();
     /// ```
-    fn to_ordered_float(&self) -> Vec<OrderedFloat<f64>> {
-        self.into_iter().map(|x| OrderedFloat(*x)).collect_vec()
+    fn to_ordered_float(&self) -> Array1<OrderedFloat<f64>> {
+        self.map(|x| OrderedFloat(*x))
     }
 }
 

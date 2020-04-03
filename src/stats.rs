@@ -2,7 +2,7 @@ use num_traits::{Float, FromPrimitive};
 use std::iter::Sum;
 use ndarray::{Array1};
 
-trait SummaryStatistics<T: Float + Sum + FromPrimitive> {
+pub trait SummaryStatistics<T: Float + Sum + FromPrimitive> {
     // fn mean(&self) -> Option<T>;
     fn var(&self, ddof: T) -> T;
     fn std(&self, ddof: T) -> T;

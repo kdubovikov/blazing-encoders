@@ -49,6 +49,13 @@ mod tests {
     }
 
     #[test]
+    fn test_var_unique_element() {
+        let data: Array1<_> = array![1., 1., 1., 1.];
+        let var = data.var(1.);
+        assert_approx_eq!(var, 0., 1e-4);
+    }
+
+    #[test]
     fn test_std() {
         let a = array![1., -4.32, 1.14, 0.32];
         let stddev = a.std(1.);

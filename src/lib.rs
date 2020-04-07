@@ -35,9 +35,9 @@
 //!                   [9., 5., 2., 0., 7.]];
 //!
 //! let mut data = data.mapv(OrderedFloat::from);
-//! let target = [0.48263811, 0.16705367, 0.32397016, 0.10172379, 0.54362169];
+//! let target = array![0.48263811, 0.16705367, 0.32397016, 0.10172379, 0.54362169];
 //!
-//! let encoder = MatrixEncoder::fit(&data, &target, &Encoders::TargetEncoder {min_samples_leaf: 1, smoothing: 1.0});
+//! let encoder = MatrixEncoder::fit(&data, &target,  &mut Encoders::new_target_encoder(1, 1.0));
 //! encoder.transform(&mut data);
 //! ```
 //!
@@ -60,6 +60,10 @@
 //! * Currently, only the basic target encoding is implemented
 //! * The library supports only continuous target variables. As a result, it can be used only in regression settings.
 #![feature(trait_alias)]
+
+#[macro_use]
+extern crate approx;
+
 use itertools::Itertools;
 use ndarray::{Array2, ArrayView};
 use numpy::{IntoPyArray, PyArray, PyArray1, PyArray2, PyArrayDyn};

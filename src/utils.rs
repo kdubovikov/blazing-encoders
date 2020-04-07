@@ -17,8 +17,8 @@ impl ToOrderedFloat<f32> for Array1<f32> {
     /// ```
     /// use blazing_encoders::utils::ToOrderedFloat;
     /// use ordered_float::OrderedFloat;
-    /// use ndarray::Array1;
-    /// let v = Array1::<f32>::new();
+    /// use ndarray::{Array1, array};
+    /// let v = array![1., 2., 3.];
     /// let v_ordered: Array1<OrderedFloat<f32>> = v.to_ordered_float();
     /// ```
     fn to_ordered_float(&self) -> Array1<OrderedFloat<f32>> {
@@ -32,8 +32,9 @@ impl ToOrderedFloat<f64> for Array1<f64> {
     /// ```
     /// use blazing_encoders::utils::ToOrderedFloat;
     /// use ordered_float::OrderedFloat;
-    /// use ndarray::Array1;
-    /// let v = Array1::<f64>::new();
+    /// use ndarray::{Array1, array};
+    /// use numpy::npyffi::array;
+    /// let v = array![1., 2., 3.];
     /// let v_ordered: Array1<OrderedFloat<f64>> = v.to_ordered_float();
     /// ```
     fn to_ordered_float(&self) -> Array1<OrderedFloat<f64>> {

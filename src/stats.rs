@@ -37,7 +37,6 @@ impl<T: Float + Sum + FromPrimitive> SummaryStatistics<T> for Array1<T> {
 
 #[cfg(test)]
 mod tests {
-    use assert_approx_eq::assert_approx_eq;
     use super::*;
     use ndarray::array;
 
@@ -45,20 +44,20 @@ mod tests {
     fn test_var() {
         let data: Array1<_> = array![1., -4.32, 1.14, 0.32];
         let var = data.var(1.);
-        assert_approx_eq!(var, 6.7331, 1e-4);
+        assert_abs_diff_eq!(var, 6.7331, epsilon = 1e-4);
     }
 
     #[test]
     fn test_var_unique_element() {
         let data: Array1<_> = array![1., 1., 1., 1.];
         let var = data.var(1.);
-        assert_approx_eq!(var, 0., 1e-4);
+        assert_abs_diff_eq!(var, 0., epsilon = 1e-4);
     }
 
     #[test]
     fn test_std() {
         let a = array![1., -4.32, 1.14, 0.32];
         let stddev = a.std(1.);
-       assert_approx_eq!(stddev, 2.59483, 1e-4);
+       assert_abs_diff_eq!(stddev, 2.59483, epsilon = 1e-4);
     }
 }

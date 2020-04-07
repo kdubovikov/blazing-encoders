@@ -1,3 +1,5 @@
+#![feature(trait_alias)]
+
 use std::iter::Sum;
 use std::marker::PhantomData;
 
@@ -12,7 +14,10 @@ use rayon::prelude::*;
 use crate::stats::SummaryStatistics;
 use crate::utils::ToOrderedFloat;
 use std::fmt::Debug;
+use num_traits::real::Real;
+use std::fmt::Display;
 
+pub trait Data = Float + FromPrimitive + Sum + ToPrimitive + Sync + Send + Display;
 // pub trait Encoder<T>
 // where
 //     T: Float + FromPrimitive,
@@ -75,7 +80,7 @@ pub struct TargetStats<T: Float + FromPrimitive> {
     prior: T
 }
 
-impl<T: Float + FromPrimitive> TargetStats<T> {
+impl<T: Data> TargetStats<T> {
     fn new(target: &Array1<T>) -> TargetStats<T> {
         let prior = target.sum() / T::from_usize(target.len()).unwrap();
         TargetStats { prior }
@@ -83,66 +88,99 @@ impl<T: Float + FromPrimitive> TargetStats<T> {
 }
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub enum Encoders<T>
 where
     T: Float + FromPrimitive,
 {
     TargetEncoder {
+        // params
         min_samples_leaf: usize,
         smoothing: T,
+
+        // global stats
         prior: Option<T>
     },
     JamesSteinEncoder {
-        sigma: T
+        // global stats
+        prior: Option<T>,
+        global_target_var: Option<T>,
+        global_target_count: Option<usize>
     },
 }
 
-impl<T: Float + FromPrimitive> Encoders<T> {
+impl<T: Data> Encoders<T> {
     pub fn new_target_encoder(min_samples_leaf: usize, smoothing: T) -> Encoders<T> {
         Encoders::TargetEncoder { min_samples_leaf, smoothing, prior: None }
     }
 
-    pub fn new_james_stein_encoder(sigma: T) -> Encoders<T> {
-        Encoders::JamesSteinEncoder { sigma }
+    pub fn new_james_stein_encoder() -> Encoders<T> {
+        Encoders::JamesSteinEncoder { prior: None, global_target_var: None, global_target_count: None } 
     }
 
-    pub fn compute_stats(&mut self, target: &Array1<T>) {
+    pub fn compute_global_stats(&mut self, target: &Array1<T>) {
         match self {
-            Encoders::TargetEncoder {min_samples_leaf, smoothing, prior} => {
+            Encoders::TargetEncoder { min_samples_leaf, smoothing, prior } => {
                 let a = target.mean().unwrap();
                 *prior = Some(a);
             },
-            Encoders::JamesSteinEncoder { sigma } => {
-                unimplemented!()
+            Encoders::JamesSteinEncoder { prior, global_target_var, global_target_count } => {
+                let tprior = target.mean().expect("Error while calculating target mean");
+                let tvar = target.var(T::one());
+                let tcount = target.len();
+
+                *prior = Some(tprior);
+                *global_target_var = Some(tvar);
+                *global_target_count = Some(tcount);
             }
         }
     }
 }
 
-fn compute_encoding<T>(encoder: &Encoders<T>, val: &Array1<T>) -> T where T: Float + FromPrimitive {
+fn compute_encoding<T>(encoder: &Encoders<T>, data: &Array1<OrderedFloat<T>>, target_group: &Array1<T>) -> Option<T> where T: Data {
     match *encoder {
         Encoders::TargetEncoder {min_samples_leaf, smoothing, prior} => {
             const err_msg: &str = "Target statistics were not computed prior to encoding computation";
             let prior = prior.expect(err_msg);
-            let col_len =  T::from_usize(val.len()).unwrap();
+            let col_len =  T::from_usize(target_group.len())?;
 
-            let group_mean = val.mean().unwrap();
-            let exp_count = -(col_len - T::from_usize(min_samples_leaf).unwrap()) / T::from(smoothing).unwrap();
-            let smoove = T::one() / (T::one() + exp_count.exp());
-            prior * (T::one() - smoove) + group_mean * smoove
+            if col_len == T::one() {
+                Some(prior)
+            } else {
+                let group_mean = target_group.mean()?;
+                let exp_count = -(col_len - T::from_usize(min_samples_leaf)?) / T::from(smoothing)?;
+                let smoove = T::one() / (T::one() + exp_count.exp());
+                Some(prior * (T::one() - smoove) + group_mean * smoove)
+            }
         },
 
-        Encoders::JamesSteinEncoder {sigma} => {
-            let var = val.var_axis(Axis(0), T::one());
-            unimplemented!()
+        Encoders::JamesSteinEncoder { prior, global_target_var, global_target_count } => {
+            if target_group.len() == global_target_count? {
+                return prior;
+            }
+
+            let tcat_count = T::from_usize(data.iter().unique().count())?;
+            let tlocal_target_var = target_group.var(T::one());
+            let group_mean = target_group.mean()?;    
+
+            let mut smoothing = tlocal_target_var / (global_target_var? + tlocal_target_var) * (tcat_count - T::from_i32(3)?) / (tcat_count - T::one());
+            smoothing = T::one() - smoothing;
+
+            if smoothing < T::zero() {
+                smoothing = T::zero();
+            } else if smoothing > T::one() {
+                smoothing = T::one();
+            }
+
+            Some(smoothing * group_mean + (T::one() - smoothing) * prior?)
         }
     }
 }
 
 impl<D, T> MatrixEncoder<D, T>
 where
-    T: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
-    D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
+    T: Data,
+    D: Data,
 {
     /// Create a new `TargetEncoder` and compute target encodings for all columns.
     /// This function does not transform the original dataset. See [`transform`](TargetEncoder::transform)
@@ -151,7 +189,8 @@ where
         target: &Array1<T>,
         encoder: &mut Encoders<D>,
     ) -> MatrixEncoder<D, T> {
-        encoder.compute_stats(&target.map(|x| D::from(*x).unwrap()));
+        // TODO split into compute_global_stats(target) and compute_column_stats(data, target). The second one should be used inside ColumnEncoder
+        encoder.compute_global_stats(&target.map(|x| D::from(*x).unwrap()));
         let mut encodings: Vec<ColumnTargetEncoder<D, T>> =
             Vec::with_capacity(data.len_of(Axis(1)));
 
@@ -159,10 +198,10 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(_, row)| {
-                let mut owned_row = row.to_owned();
-                let mut enc = owned_row
+                // let mut owned_row = row.to_owned();
+                let mut enc = row
                     .map(|x| OrderedFloat::<D>::from(*x));
-                ColumnTargetEncoder::fit(&mut enc, target, encoder)
+                ColumnTargetEncoder::fit(&mut enc, target, &encoder)
             })
             .collect_into_vec(&mut encodings);
 
@@ -182,8 +221,8 @@ where
 
 impl<D, T> ColumnTargetEncoder<D, T>
 where
-    T: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
-    D: Float + Sum + FromPrimitive + ToPrimitive + Sync + Send,
+    T: Data,
+    D: Data,
 {
     /// Create new `ColumnTargetEncoder` and compute target encodings for a single column.
     /// This function does not transform the original dataset. See [`transform`](ColumnTargetEncoder::transform)
@@ -209,16 +248,10 @@ where
             FnvHashMap::with_capacity_and_hasher(num_groups, Default::default());
 
         for (k, v) in &groups {
-            let val: Array1<D> = v.map(|x| D::from(*x.1).unwrap()).collect();
-            let count: usize = val.len();
+            let target_group: Array1<D> = v.map(|x| D::from(*x.1).unwrap()).collect();
 
-            if count == 1 {
-                encodings.insert(k, OrderedFloat::from(prior));
-            } else {
-                // let encoding = compute_encoding(encoder, &val, target, D::from_usize(count).unwrap(), prior);
-                let encoding = compute_encoding(encoder, &val);
-                encodings.insert(k, OrderedFloat::from(encoding));
-            }
+            let encoding = compute_encoding(encoder, &data, &target_group).expect(&format!("Error while computing encoding for category {}", k));
+            encodings.insert(k, OrderedFloat::from(encoding));
         }
 
         ColumnTargetEncoder {
@@ -243,9 +276,6 @@ where
 #[cfg(test)]
 mod tests {
     use ndarray::Zip;
-    use numpy::npyffi::array;
-
-    use assert_approx_eq::assert_approx_eq;
 
     use super::*;
 
@@ -256,7 +286,41 @@ mod tests {
         let y = array![1., 2., 2., 1., 0., 1., 2.];
 
         let mut encoder = Encoders::new_target_encoder(1, 1.0);
-        encoder.compute_stats(&y);
+        encoder.compute_global_stats(&y);
+
+        let encoder = ColumnTargetEncoder::fit(
+            &x,
+            &y,
+            &mut encoder,
+        );
+        encoder.transform(&mut x);
+
+        let expected = array![
+            1.0340579777206051,
+            1.9148550556984874,
+            1.9148550556984874,
+            1.0340579777206051,
+            1.2857142857142858,
+            1.0340579777206051,
+            1.9148550556984874,
+        ];
+        let actual = x.iter().map(|x| x.0).collect_vec();
+        expected
+            .iter()
+            .zip(actual.iter())
+            .for_each(|(expected, actual): (&f64, &f64)| {
+               assert_abs_diff_eq!(expected, actual, epsilon = 1e-4);
+            });
+    }
+
+    #[test]
+    fn test_fit_one_column_james_stein() {
+        let x = array![0., 1., 1., 0., 3., 0., 1.];
+        let mut x = x.to_ordered_float();
+        let y = array![1., 2., 2., 1., 0., 1., 2.];
+
+        let mut encoder = Encoders::new_james_stein_encoder();
+        encoder.compute_global_stats(&y);
 
         let encoder = ColumnTargetEncoder::fit(
             &x,
@@ -274,12 +338,13 @@ mod tests {
             1.0340579777206051,
             1.9148550556984874,
         ];
-        let actual = x.iter().map(|x| x.0).collect_vec();
+        let actual: Vec<f64> = x.iter().map(|x| x.0).collect_vec();
         expected
             .iter()
             .zip(actual.iter())
             .for_each(|(expected, actual): (&f64, &f64)| {
-                assert_approx_eq!(expected, actual);
+                println!("{} {}", expected, actual);
+                // assert_abs_diff_eq!(expected, actual, epsilon = 1e-4);
             });
     }
 
@@ -289,8 +354,6 @@ mod tests {
         let y = array![1., 2., 2., 1., 0., 1., 2.];
 
         let mut encoder = Encoders::new_target_encoder(1, 1.0);
-        encoder.compute_stats(&y);
-
         let encoder = MatrixEncoder::fit(
             &x,
             &y,
@@ -299,7 +362,7 @@ mod tests {
         encoder.transform(&mut x);
 
         for r in x.iter() {
-            assert_approx_eq!(r.0, 1.2857142857142858);
+            assert_abs_diff_eq!(r.0,  1.2857142857142858, epsilon = 1e-8);
         }
     }
 
@@ -332,7 +395,8 @@ mod tests {
         encoder.transform(&mut a);
 
         Zip::from(&a).and(&expected).apply(|&a, &expected| {
-            assert_approx_eq!(a.0, expected);
+            // assert_approx_eq!(a.0, expected);
+            assert_abs_diff_eq!(a.0, expected, epsilon = 1e-4);
         });
     }
 }

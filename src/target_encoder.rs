@@ -200,7 +200,7 @@ where
             .map(|(_, row)| {
                 // let mut owned_row = row.to_owned();
                 let mut enc = row
-                    .map(|x| OrderedFloat::<D>::from(*x));
+                    .map(|x| OrderedFloat::<D>(**x));
                 ColumnTargetEncoder::fit(&mut enc, target, &encoder)
             })
             .collect_into_vec(&mut encodings);
@@ -251,7 +251,7 @@ where
             let target_group: Array1<D> = v.map(|x| D::from(*x.1).unwrap()).collect();
 
             let encoding = compute_encoding(encoder, &data, &target_group).expect(&format!("Error while computing encoding for category {}", k));
-            encodings.insert(k, OrderedFloat::from(encoding));
+            encodings.insert(k, OrderedFloat(encoding));
         }
 
         ColumnTargetEncoder {
@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_fit_one_category() {
-        let mut x = Array2::<f64>::zeros((10, 7)).mapv(OrderedFloat::from);
+        let mut x = Array2::<f64>::zeros((10, 7)).mapv(OrderedFloat);
         let y = array![1., 2., 2., 1., 0., 1., 2.];
 
         let mut encoder = Encoders::new_target_encoder(1, 1.0);
@@ -376,7 +376,7 @@ mod tests {
             [9., 5., 2., 0., 7.]
         ];
 
-        let mut a = a.mapv(OrderedFloat::from);
+        let mut a = a.mapv(OrderedFloat);
 
         let b = array![0.48263811, 0.16705367, 0.32397016, 0.10172379, 0.54362169];
         let expected = array![
@@ -394,7 +394,7 @@ mod tests {
         );
         encoder.transform(&mut a);
 
-        Zip::from(&a).and(&expected).apply(|&a, &expected| {
+        Zip::from(&a).and(&expected).for_each(|&a, &expected| {
             // assert_approx_eq!(a.0, expected);
             assert_abs_diff_eq!(a.0, expected, epsilon = 1e-4);
         });

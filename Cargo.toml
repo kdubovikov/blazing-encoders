@@ -27,17 +27,21 @@ rayon = "1.3.0"
 ndarray = {version = "0.15.3", features=["rayon"]}
 ordered-float = "2.5.1"
 numpy = "0.13.1"
-pyo3 = { version = "0.13.1" }
+# pyo3 = { version = "0.13.1" }
 num-traits = "0.2.11"
 itertools = "0.10.1"
 rand = "0.8.4"
 #intel-mkl-sys = "0.1.0"
 fnv = "1.0.6"
 
-[features]
-# needed to run tests, see https://github.com/PyO3/pyo3/issues/340
-extension-module = ["pyo3/extension-module"]
-default = ["extension-module"]
+[dependencies.pyo3]
+version = "0.13.2"
+features = ["extension-module"]
+
+# [features]
+# # needed to run tests, see https://github.com/PyO3/pyo3/issues/340
+# extension-module = ["pyo3/extension-module"]
+# default = ["extension-module"]
 
 #[profile.dev]
 #opt-level = 3

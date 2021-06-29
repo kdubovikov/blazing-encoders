@@ -14,7 +14,7 @@ pub trait ToOrderedFloat<T>: where T: Float {
 impl ToOrderedFloat<f32> for Array1<f32> {
     /// Covert a vector of floats to a vector of OrderedFloat
     /// # Example
-    /// ```
+    /// ``` ignore
     /// use blazing_encoders::utils::ToOrderedFloat;
     /// use ordered_float::OrderedFloat;
     /// use ndarray::{Array1, array};
@@ -29,7 +29,7 @@ impl ToOrderedFloat<f32> for Array1<f32> {
 impl ToOrderedFloat<f64> for Array1<f64> {
     /// Covert a vector of floats to a vector of OrderedFloat
     /// # Example
-    /// ```
+    /// ``` ignore
     /// use blazing_encoders::utils::ToOrderedFloat;
     /// use ordered_float::OrderedFloat;
     /// use ndarray::{Array1, array};
@@ -54,7 +54,7 @@ pub fn gen_array<T, D>(n: usize, distr: &D) -> Vec<T>
 
 /// Generate an array using random elements from distribution `distr`
 /// # Example
-/// ```
+/// ``` ignore
 /// # use blazing_encoders::utils::gen_array_f32;
 /// use rand::distributions::Uniform;
 /// let arr = gen_array_f32(10, &Uniform::new(0, 10));
@@ -70,7 +70,7 @@ pub fn gen_array_f32<T, D>(n: usize, distr: &D) -> Vec<f32>
 
 /// Generate an [`Array2`](ndarray::Array2) matrix using random elements from distribution `distr`
 /// # Example
-/// ```
+/// ``` ignore
 /// # use blazing_encoders::utils::gen_array2_f32;
 /// use rand::distributions::Uniform;
 /// let arr = gen_array2_f32((5, 5), &Uniform::new(0, 10));

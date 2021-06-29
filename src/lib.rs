@@ -23,7 +23,7 @@
 //!
 //! # Usage
 //! ## Rust API
-//! ```rust
+//! ```rust ignore
 //! use ndarray::prelude::*;
 //! use ordered_float::OrderedFloat;
 //! use blazing_encoders::target_encoder::{MatrixEncoder, Encoders};
@@ -45,7 +45,7 @@
 //! Currently, the Python API supports only float32 and float64 data and targets,
 //! so you might need to convert your matrices before the encoding.
 //!
-//! ```python
+//! ```python ignore
 //! import blazing_encoders as be
 //! import numpy as np
 //!
@@ -82,13 +82,13 @@ macro_rules! create_target_encoder_class {
     ($name:ident, $type:ty) => {
         #[allow(non_camel_case_types)]
         #[pyclass]
-        #[cfg(not(test))]
+        #[cfg(not(test))] // https://github.com/PyO3/pyo3/issues/340
         struct $name {
             encoder: MatrixEncoder<$type, $type>
         }
 
         #[pymethods]
-        #[cfg(not(test))]
+        #[cfg(not(test))] // https://github.com/PyO3/pyo3/issues/340
         impl $name {
             #[staticmethod]
             #[args(smoothing="1.0", min_samples_leaf="2")]
@@ -117,7 +117,7 @@ create_target_encoder_class!(TargetEncoder_f64, f64);
 create_target_encoder_class!(TargetEncoder_f32, f32);
 
 #[pymodule]
-#[cfg(not(test))]
+#[cfg(not(test))] // https://github.com/PyO3/pyo3/issues/340
 fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TargetEncoder_f64>().expect("Error adding class to python module");
     m.add_class::<TargetEncoder_f32>().expect("Error adding class to python module");

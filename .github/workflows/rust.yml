@@ -47,4 +47,4 @@ jobs:
       run: |
         pip install -r examples/requirements.txt
         pip install target/wheels/*.whl
-        python3.6 examples/example.py
+        python${{ matrix.python-version }} examples/example.py

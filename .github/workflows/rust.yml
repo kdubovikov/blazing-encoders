@@ -41,7 +41,7 @@ jobs:
     - name: Upload wheel as artifacts
       uses: actions/upload-artifact@master
       with:
-        name: wheels
+        name: wheel-${{ matrix.platform }}-${{ matrix.python-version }}
         path: target/wheels/
     - name: Run examples
       run: |

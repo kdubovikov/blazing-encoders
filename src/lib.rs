@@ -82,11 +82,13 @@ macro_rules! create_target_encoder_class {
     ($name:ident, $type:ty) => {
         #[allow(non_camel_case_types)]
         #[pyclass]
+        #[cfg(not(test))]
         struct $name {
             encoder: MatrixEncoder<$type, $type>
         }
 
         #[pymethods]
+        #[cfg(not(test))]
         impl $name {
             #[staticmethod]
             #[args(smoothing="1.0", min_samples_leaf="2")]
@@ -115,6 +117,7 @@ create_target_encoder_class!(TargetEncoder_f64, f64);
 create_target_encoder_class!(TargetEncoder_f32, f32);
 
 #[pymodule]
+#[cfg(not(test))]
 fn blazing_encoders(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TargetEncoder_f64>().expect("Error adding class to python module");
     m.add_class::<TargetEncoder_f32>().expect("Error adding class to python module");

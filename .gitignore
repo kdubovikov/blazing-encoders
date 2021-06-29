@@ -13,3 +13,5 @@ Cargo.lock
 .vscode
 venv
 .DS_Store
+.log
+.code-workspace

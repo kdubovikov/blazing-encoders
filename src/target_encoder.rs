@@ -47,35 +47,6 @@ where
     phantom_target: PhantomData<T>
 }
 
-// impl<'a, T: Float + FromPrimitive, D: Float> Encoder<T> for ColumnTargetEncoder<'a, T, D> {
-//     fn compute_encoding(&self) -> T {
-//         let group_mean = self.val.mean().unwrap();
-//         let exp_count = -(self.count - T::from(self.min_samples_leaf).unwrap()) / self.smoothing;
-//         let smoove = T::one() / (T::one() + exp_count.exp());
-//         self.prior * (T::one() - smoove) + group_mean * smoove
-//     }
-// }
-
-// enum GlobalStats<T: Float> {
-//     TargetEncoder { prior: T },
-// }
-
-// fn compute_global_stats<D: Float, T: Float>(
-//     encoder: &Encoders<T>,
-//     data: &Array1<T>,
-//     target: &Array1<T>,
-// ) -> GlobalStats<T> {
-//     match encoder {
-//         Encoders::TargetEncoder {
-//             min_samples_leaf: usize,
-//             smoothing: T,
-//         } => {
-//             let prior = D::from(target.sum()) / D::from(target.len());
-//             GlobalStats::TargetEncoder { prior }
-//         }
-//     }
-// }
-
 pub struct TargetStats<T: Float + FromPrimitive> {
     prior: T
 }

@@ -42,6 +42,11 @@ jobs:
       with:
         name: wheels
         path: target/wheels/
+    - name: Upload to PyPi
+      env:
+        MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+      run: maturin publish --username kdubovikov
+        
     - name: Run examples
       run: |
         pip install -r examples/requirements.txt

@@ -1,6 +1,6 @@
 [package]
 name = "blazing_encoders"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Kirill Dubovikov <dubovikov.kirill@gmail.com>"]
 edition = "2018"
 

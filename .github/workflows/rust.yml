@@ -44,9 +44,15 @@ jobs:
         name: wheel-${{ matrix.platform }}-${{ matrix.python-version }}
         path: target/wheels/
     - name: Upload to PyPi
+      uses: messense/maturin-action@v1
+      with:
+        maturin-version: latest
+        rust-toolchain: nightly
+        command: publish
+        args: --release -u $(MATURIN_USERNAME) -p $(MATURIN_PASSWORD)
       env:
         MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
-      run: maturin publish --username kdubovikov
+        MATURIN_USERNAME: ${{ secrets.MATURIN_USERNAME }}
         
     - name: Run examples
       run: |

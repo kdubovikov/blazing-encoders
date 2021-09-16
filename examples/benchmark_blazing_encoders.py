@@ -30,6 +30,10 @@ def compare_encoders(a, b, cols, blazing_encoder_fun, flatten_te=False):
     assert np.allclose(encoding_te, encoding_be)
     print("Results match 👍🏻")
 
+def blazing_encoder_fun(data, target):
+    encoder = be.TargetEncoder_f64.fit(data, target, smoothing=1.0, min_samples_leaf=1)
+    encoded_data = encoder.transform(data)
+    return encoded_data
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="blazing_encoders benchmark")
@@ -38,17 +42,11 @@ if __name__ == '__main__':
     parser.add_argument('n_cats', type=int, help="number of categories to benchmark on")
     args = parser.parse_args()
 
-    print("‍Benchmarking target encoding for 1 column 💨")
-    a = np.random.randint(0, args.n_cats, args.n_rows).astype('float')
-    b = np.random.rand(args.n_rows)
-
-    compare_encoders(a, b, [0], be.target_encoding, flatten_te=True)
-
     print(f"Benchmarking target encoding for {args.n_cols} columns 💨")
     matrix_size = (args.n_rows, args.n_cols)
     a = np.random.randint(0, args.n_cats, matrix_size).astype('float')
     b = np.random.rand(args.n_rows)
 
-    compare_encoders(a, b, range(0, args.n_cols), be.par_column_target_encoding)
+    compare_encoders(a, b, range(0, args.n_cols), blazing_encoder_fun)
 
 

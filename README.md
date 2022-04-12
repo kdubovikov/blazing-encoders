@@ -29,4 +29,4 @@ You can use two of the available classes: `TargetEncoder_f64`, and `TargetEncode
 Underneath, the library will share as much memory as possible so that overhead should be minimal. Also, it will parallelize target encoding computation so that the overall process will complete much faster.
 
 ## Documentation and examples
-You can find out how to use the library [here](https://github.com/kdubovikov/blazing-encoders/blob/master/examples/example.py). Also, you can read more at [this blog post](blog.kdubovikov.ml/articles/datascience/blazing-encoders).
+You can find out how to use the library [here](https://github.com/kdubovikov/blazing-encoders/blob/master/examples/example.py). Also, you can read more at [this blog post](https://blog.kdubovikov.ml/articles/datascience/blazing-encoders).
